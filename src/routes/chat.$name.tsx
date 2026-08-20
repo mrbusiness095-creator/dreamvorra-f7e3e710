@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BackButton, Flag, Header, Modal, RegisterButton } from "@/components/dv";
+import { BackButton, Flag, Header, Modal, RegisterButton, SupportWidget } from "@/components/dv";
 import { findUser, firstMessageBroken } from "@/data/users";
 
 export const Route = createFileRoute("/chat/$name")({
@@ -133,6 +133,8 @@ function ChatPage() {
           Tuma
         </button>
       </div>
+
+      <SupportWidget />
 
       <Modal open={locked} onClose={() => setLocked(false)} icon="🔒" title="Huwezi Kutuma Ujumbe">
         <p>
