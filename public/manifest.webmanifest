@@ -1,0 +1,14 @@
+{
+  "name": "DreamVora Tanzania",
+  "short_name": "DreamVora",
+  "description": "Get paid to chat with foreigners. Connect, Learn, Earn.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0d1b3e",
+  "theme_color": "#0d1b3e",
+  "icons": [
+    { "src": "/favicon.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/favicon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

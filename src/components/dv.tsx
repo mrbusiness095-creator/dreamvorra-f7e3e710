@@ -178,6 +178,49 @@ export function BackButton({ onClick, label }: { onClick: () => void; label: str
 }
 
 export function DownloadAppPopup() {
+  return <DownloadAppPopupInner />;
+}
+
+export function SupportWidget() {
+  const [open, setOpen] = useState(false);
+  const smsHref = "sms:+255743871339?body=Habari,%20nina%20swali%20kuhusu%20dreamvora";
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="fixed right-3 bottom-4 z-40 flex items-center gap-2 rounded-full bg-primary px-3.5 py-2.5 text-[11px] font-bold text-primary-foreground shadow-[var(--shadow-modal)]"
+      >
+        💬 <span>customer assistance</span>
+      </button>
+
+      <Modal open={open} onClose={() => setOpen(false)} icon="📞" title="Contact Customer Support">
+        <p className="text-xs">Choose how you want to reach us</p>
+        <a
+          href={smsHref}
+          className="flex items-center gap-3 rounded-xl border border-border bg-secondary p-3 text-left"
+        >
+          <span className="text-2xl">💬</span>
+          <span className="flex-1">
+            <span className="block text-sm font-bold text-foreground">Send SMS</span>
+            <span className="block text-[11px] text-muted-foreground">
+              Send us a text message (Tuma Ujumbe)
+            </span>
+          </span>
+          <span className="text-muted-foreground">→</span>
+        </a>
+        <p className="text-[11px]">
+          📌 <strong>SMS:</strong> For standard text message support — 0743871339
+        </p>
+        <div className="pt-2">
+          <BackButton onClick={() => setOpen(false)} label="Close" />
+        </div>
+      </Modal>
+    </>
+  );
+}
+
+function DownloadAppPopupInner() {
   const [hidden, setHidden] = useState(false);
   const [prompt, setPrompt] = useState<any>(null);
   const [toast, setToast] = useState("");
@@ -198,6 +241,7 @@ export function DownloadAppPopup() {
   const install = () => {
     if (prompt) {
       prompt.prompt();
+      prompt.userChoice?.finally?.(() => setPrompt(null));
       return;
     }
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent || "");

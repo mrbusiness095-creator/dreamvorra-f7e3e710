@@ -90,6 +90,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "DreamVora, DreamVora Tanzania, get paid to chat, chat with foreigners, online earning Tanzania, Swahili chat platform",
       },
       { name: "robots", content: "index, follow" },
+      { name: "theme-color", content: "#0d1b3e" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-title", content: "DreamVora" },
       { property: "og:title", content: "DreamVora Tanzania" },
       { property: "og:description", content: "Connect, Learn, Earn with DreamVora Tanzania." },
       { property: "og:type", content: "website" },
@@ -101,6 +105,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: appCss,
       },
       { rel: "icon", href: "/favicon.png", type: "image/png" },
+      { rel: "apple-touch-icon", href: "/favicon.png" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
     ],
   }),
   shellComponent: RootShell,
@@ -125,6 +131,11 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
