@@ -198,6 +198,7 @@ export function DownloadAppPopup() {
   const install = () => {
     if (prompt) {
       prompt.prompt();
+      prompt.userChoice?.finally?.(() => setPrompt(null));
       return;
     }
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent || "");
