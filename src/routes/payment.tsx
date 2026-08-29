@@ -2,18 +2,18 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { checkPaymentStatus, startPayment, PAYMENT_AMOUNT } from "@/lib/kozena.functions";
-import { getAccount, markPaid, saveAccount } from "@/lib/local-storage";
+import { clearPendingChat, getAccount, getPendingChat, markPaid, saveAccount } from "@/lib/local-storage";
 
 export const Route = createFileRoute("/payment")({
   head: () => ({
     meta: [
-      { title: "Lipa — DREAMVORA SITE" },
+      { title: "Lipa — KOZENA SITE" },
       {
         name: "description",
         content:
-          "Lipia ada ya DREAMVORA SITE kwa USSD Push. Weka namba yako ya simu na thibitisha malipo kwenye simu.",
+          "Lipia ada ya KOZENA SITE kwa USSD Push. Weka namba yako ya simu na thibitisha malipo kwenye simu.",
       },
-      { property: "og:title", content: "Lipa — DREAMVORA SITE" },
+      { property: "og:title", content: "Lipa — KOZENA SITE" },
       { property: "og:description", content: "Lipia kwa USSD Push moja kwa moja kwenye simu yako." },
     ],
   }),
@@ -40,7 +40,13 @@ function PaymentPage() {
       return;
     }
     if (account.paid) {
-      navigate({ to: "/dashboard" });
+      const pendingChat = getPendingChat();
+      if (pendingChat) {
+        clearPendingChat();
+        navigate({ to: "/chat/$name", params: { name: pendingChat } });
+      } else {
+        navigate({ to: "/dashboard" });
+      }
       return;
     }
     setPhone(account.phone);
@@ -77,7 +83,13 @@ function PaymentPage() {
           if (res.payment_status === "COMPLETED") {
             if (timer.current) clearInterval(timer.current);
             markPaid();
-            navigate({ to: "/dashboard" });
+            const pendingChat = getPendingChat();
+            if (pendingChat) {
+              clearPendingChat();
+              navigate({ to: "/chat/$name", params: { name: pendingChat } });
+            } else {
+              navigate({ to: "/dashboard" });
+            }
             return;
           }
           if (["CANCELLED", "USERCANCELLED", "REJECTED"].includes(res.payment_status)) {
@@ -108,7 +120,7 @@ function PaymentPage() {
     <div className="min-h-screen bg-k-slate-50 font-jost text-k-slate-800">
       <header className="flex items-center justify-between bg-k-green-900 px-6 py-4">
         <span className="text-lg font-extrabold tracking-tight text-white">
-          DREAMVORA <span className="text-k-amber-400">SITE</span>
+          KOZENA <span className="text-k-amber-400">SITE</span>
         </span>
         <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] tracking-wide text-k-green-100">MALIPO SALAMA</span>
       </header>
@@ -119,7 +131,7 @@ function PaymentPage() {
           <div>
             <h2 className="text-xs font-bold tracking-widest text-k-red-600">LINDA PESA YAKO</h2>
             <p className="mt-1 text-sm leading-relaxed text-k-red-900">
-              Lipia kupitia mfumo huu pekee au namba ya dharura ya <strong>DREAMVORA</strong>.
+              Lipia kupitia mfumo huu pekee.
               Malipo nje ya mfumo huu ni batili na hayatakubaliwa.
             </p>
           </div>

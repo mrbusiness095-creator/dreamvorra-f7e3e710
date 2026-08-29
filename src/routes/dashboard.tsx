@@ -13,6 +13,7 @@ function DashboardPage() {
   const navigate = useNavigate();
   const [account, setAccount] = useState<DreamVoraAccount | null>(null);
   const [amount, setAmount] = useState("");
+  const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -27,6 +28,7 @@ function DashboardPage() {
       return;
     }
     setAccount(saved);
+    setPhone(saved.phone);
   }, [navigate]);
 
   const pageUsers = useMemo(() => usersDatabase.slice(0, 9), []);
@@ -35,7 +37,7 @@ function DashboardPage() {
     e.preventDefault();
     setError(null);
     setNotice(null);
-    const result = withdrawBalance(Number(amount.replace(/,/g, "")));
+    const result = withdrawBalance(Number(amount.replace(/,/g, "")), phone);
     if (!result.ok) {
       setError(result.error);
       return;
@@ -80,6 +82,13 @@ function DashboardPage() {
               placeholder="50000"
               value={amount}
               onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))}
+            />
+            <input
+              className="k-field mt-3"
+              inputMode="tel"
+              placeholder="06XXXXXXXX"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
             />
             {error && <p className="mt-2 text-xs font-semibold text-k-red-600">{error}</p>}
             {notice && <p className="mt-2 text-xs font-semibold text-k-green-700">{notice}</p>}
