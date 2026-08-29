@@ -21,7 +21,7 @@ export function Flag({ code, size = 22 }: { code: string; size?: number }) {
   );
 }
 
-export function Header({ onWithdraw, onBalance }: { onWithdraw: () => void; onBalance: () => void }) {
+export function Header({ onWithdraw, onBalance, currentBalance }: { onWithdraw: () => void; onBalance: () => void; currentBalance?: number | null }) {
   const [online, setOnline] = useState(2535);
 
   useEffect(() => {
@@ -57,7 +57,7 @@ export function Header({ onWithdraw, onBalance }: { onWithdraw: () => void; onBa
           <span className="text-[8px] font-semibold tracking-wide text-muted-foreground">
             CURRENT BALANCE
           </span>
-          <span className="text-xs font-bold text-foreground">👁 •••••</span>
+          <span className="text-xs font-bold text-foreground">{typeof currentBalance === "number" ? `TZS ${currentBalance.toLocaleString()}` : "👁 •••••"}</span>
         </button>
       </div>
     </header>
