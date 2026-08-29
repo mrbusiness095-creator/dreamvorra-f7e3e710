@@ -9,7 +9,6 @@ import {
   Modal,
   RegisterButton,
   Slogan,
-  SupportWidget,
 } from "@/components/dv";
 import { usersDatabase } from "@/data/users";
 
@@ -139,7 +138,6 @@ function Index() {
 
       <Footer onWithdraw={() => setWithdraw(true)} />
       <DownloadAppPopup />
-      <SupportWidget />
 
       <Modal
         open={withdraw}

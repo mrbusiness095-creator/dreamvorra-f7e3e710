@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BackButton, Flag, Header, Modal, RegisterButton, SupportWidget } from "@/components/dv";
+import { BackButton, Flag, Header, Modal, RegisterButton } from "@/components/dv";
 import { findUser, firstMessageBroken } from "@/data/users";
+import { addEarnings, getAccount } from "@/lib/local-storage";
 
 export const Route = createFileRoute("/chat/$name")({
   head: ({ params }) => ({
@@ -40,6 +41,21 @@ function ChatPage() {
   const [withdraw, setWithdraw] = useState(false);
   const [balance, setBalance] = useState(false);
   const [text, setText] = useState("");
+  const [paid, setPaid] = useState(false);
+  const [earned, setEarned] = useState(false);
+
+  useEffect(() => {
+    const account = getAccount();
+    if (!account) {
+      navigate({ to: "/register" });
+      return;
+    }
+    if (!account.paid) {
+      navigate({ to: "/payment" });
+      return;
+    }
+    setPaid(true);
+  }, [navigate]);
 
   useEffect(() => {
     if (!user) return;
@@ -73,7 +89,12 @@ function ChatPage() {
 
   const send = () => {
     if (!text.trim()) return;
-    setLocked(true);
+    if (!earned) {
+      addEarnings(user.money);
+      setEarned(true);
+    }
+    setLocked(false);
+    setText("");
   };
 
   return (
@@ -133,8 +154,6 @@ function ChatPage() {
           Tuma
         </button>
       </div>
-
-      <SupportWidget />
 
       <Modal open={locked} onClose={() => setLocked(false)} icon="🔒" title="Huwezi Kutuma Ujumbe">
         <p>
