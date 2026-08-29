@@ -316,8 +316,16 @@ function Index() {
       >
         <p className="text-sm">Choose how you want to reach us</p>
         <div className="dv-home-contact-options">
-         
-
+          <a
+            href="https://whatsapp.com/channel/0029VbCV06a4Y9luvN14gz10"
+            target="_blank"
+            rel="noreferrer"
+          >
+            💬 <span><strong>Follow WhatsApp Channel</strong><small>Connect with our community and get support</small></span> →
+          </a>
+          <a href="sms:+255747741813?body=Habari,%20nina%20swali%20kuhusu%20dreamvora">
+            💬 <span><strong>Send SMS</strong><small>Send us a text message (Tuma Ujumbe)</small></span> →
+          </a>
         </div>
         <BackButton onClick={() => setContact(false)} label="Close" />
       </Modal>
