@@ -7,13 +7,13 @@ import { getAccount, markPaid, saveAccount } from "@/lib/local-storage";
 export const Route = createFileRoute("/payment")({
   head: () => ({
     meta: [
-      { title: "Lipa — KOZENA SITE" },
+      { title: "Lipa — DREAMVORA SITE" },
       {
         name: "description",
         content:
-          "Lipia ada ya KOZENA SITE kwa USSD Push. Weka namba yako ya simu na thibitisha malipo kwenye simu.",
+          "Lipia ada ya DREAMVORA SITE kwa USSD Push. Weka namba yako ya simu na thibitisha malipo kwenye simu.",
       },
-      { property: "og:title", content: "Lipa — KOZENA SITE" },
+      { property: "og:title", content: "Lipa — DREAMVORA SITE" },
       { property: "og:description", content: "Lipia kwa USSD Push moja kwa moja kwenye simu yako." },
     ],
   }),
@@ -108,7 +108,7 @@ function PaymentPage() {
     <div className="min-h-screen bg-k-slate-50 font-jost text-k-slate-800">
       <header className="flex items-center justify-between bg-k-green-900 px-6 py-4">
         <span className="text-lg font-extrabold tracking-tight text-white">
-          KOZENA <span className="text-k-amber-400">SITE</span>
+          DREAMVORA <span className="text-k-amber-400">SITE</span>
         </span>
         <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] tracking-wide text-k-green-100">MALIPO SALAMA</span>
       </header>
@@ -119,7 +119,7 @@ function PaymentPage() {
           <div>
             <h2 className="text-xs font-bold tracking-widest text-k-red-600">LINDA PESA YAKO</h2>
             <p className="mt-1 text-sm leading-relaxed text-k-red-900">
-              Lipia kupitia mfumo huu pekee au namba ya dharura ya <strong>KOZENASITE</strong>.
+              Lipia kupitia mfumo huu pekee au namba ya dharura ya <strong>DREAMVORA</strong>.
               Malipo nje ya mfumo huu ni batili na hayatakubaliwa.
             </p>
           </div>
