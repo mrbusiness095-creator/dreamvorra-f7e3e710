@@ -1,143 +1,294 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import {
-  BackButton,
-  DownloadAppPopup,
-  Flag,
-  Footer,
-  Header,
-  Modal,
-  RegisterButton,
-  Slogan,
-} from "@/components/dv";
+import { useEffect, useMemo, useState } from "react";
+import { Flag, Modal, RegisterButton, BackButton } from "@/components/dv";
 import { usersDatabase } from "@/data/users";
 
 const USERS_PER_PAGE = 9;
+const SITE_URL = "https://dreamvorra.site";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "DreamVora Tanzania | Get Paid to Chat with Foreigners" },
+      { title: "DreamVora site|Official site" },
       {
         name: "description",
         content:
-          "DreamVora ni jukwaa la Tanzania ambapo unaunganishwa na wageni, unachati, unafundisha Kiswahili na unapata fedha mtandaoni.",
+          "DreamVora is a Tanzania online platform where users can connect with foreigners, chat, learn languages, share culture, and discover earning opportunities online.",
       },
       {
-        property: "og:title",
-        content: "DreamVora Tanzania | Get Paid to Chat with Foreigners",
+        name: "keywords",
+        content:
+          "DreamVora, DreamVora Tanzania, dream vora site, dream vora, dreamvorra, get paid to chat, chat with foreigners, online earning Tanzania, Swahili chat platform, Tanzania online jobs",
       },
+      { name: "author", content: "DreamVora" },
+      { name: "robots", content: "index, follow" },
+      { property: "og:title", content: "DreamVora Tanzania | Get Paid to Chat with Foreigners" },
       {
         property: "og:description",
         content: "Connect, Learn, Earn with DreamVora Tanzania.",
       },
+      { property: "og:image", content: `${SITE_URL}/assets/images/dreamvora-logo.png` },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: `${SITE_URL}/` },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "DreamVora Tanzania" },
+      {
+        name: "twitter:description",
+        content: "Get paid to chat with foreigners, learn languages, and earn money.",
+      },
+      { name: "twitter:image", content: `${SITE_URL}/assets/images/dreamvora-logo.png` },
+      { name: "theme-color", content: "#0d1b3e" },
     ],
+    links: [{ rel: "canonical", href: `${SITE_URL}/` }],
   }),
   component: Index,
 });
+
+function HomeHeader({
+  onWithdraw,
+  onBalance,
+}: {
+  onWithdraw: () => void;
+  onBalance: () => void;
+}) {
+  const [online, setOnline] = useState(2535);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const change = Math.floor(Math.random() * 6) + 4;
+      setOnline((value) => (Math.random() > 0.5 ? value + change : value - change));
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <header className="dv-home-header">
+      <a href="/" className="dv-home-logo-link" aria-label="DreamVora Home">
+        <img src="/assets/images/dreamvora-logo.png" alt="DreamVora Logo" className="dv-home-logo" />
+      </a>
+
+      <div className="dv-home-online">
+        <span className="dv-home-online-dot" />
+        <span>{online.toLocaleString()} live</span>
+      </div>
+
+      <div className="dv-home-header-right">
+        <button className="dv-home-withdraw" onClick={onWithdraw}>
+          💰 Withdraw
+        </button>
+        <button className="dv-home-wallet" onClick={onBalance}>
+          <span className="dv-home-wallet-title">CURRENT BALANCE</span>
+          <span className="dv-home-wallet-amount">👁 •••••</span>
+        </button>
+      </div>
+    </header>
+  );
+}
+
+function HomeFooter({
+  onWithdraw,
+  onContact,
+}: {
+  onWithdraw: () => void;
+  onContact: () => void;
+}) {
+  return (
+    <footer className="dv-home-footer">
+      <div className="dv-home-footer-content">
+        <div>
+          <img
+            src="/assets/images/dreamvora-logo-white.png"
+            alt="DreamVora"
+            className="dv-home-footer-logo"
+          />
+          <p>
+            Connect, Learn, Earn.
+            <br />
+            Get paid to chat with foreigners.
+            <br />
+            Share your culture and earn money.
+          </p>
+        </div>
+        <div>
+          <h4>Quick Links</h4>
+          <ul>
+            <li><a href="/">🏠 Home</a></li>
+            <li><button onClick={onWithdraw}>💰 Withdraw</button></li>
+            <li><button onClick={onContact}>💬 Contact Us</button></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Contact</h4>
+          <p>📱 <button onClick={onContact}>Contact Options</button></p>
+        </div>
+      </div>
+      <div className="dv-home-footer-bottom">© 2026 DreamVora · Connect, Learn, Earn.</div>
+    </footer>
+  );
+}
 
 function Index() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [withdraw, setWithdraw] = useState(false);
   const [balance, setBalance] = useState(false);
+  const [contact, setContact] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
 
-  const shuffled = useMemo(() => [...usersDatabase].sort(() => Math.random() - 0.5), []);
+  useEffect(() => {
+    const onBeforeInstall = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event);
+    };
+    const onInstalled = () => setInstallPrompt(null);
+    window.addEventListener("beforeinstallprompt", onBeforeInstall);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstall);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
+
+  const installApp = () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      installPrompt.userChoice?.finally?.(() => setInstallPrompt(null));
+      return;
+    }
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+    window.alert(
+      isIOS
+        ? 'Bonyeza Share kisha "Add to Home Screen"'
+        : 'Tumia menu (⋮) ya kivinjari chako kisha "Install app"',
+    );
+  };
+
+  const shuffled = useMemo(
+    () => [...usersDatabase].sort(() => Math.random() - 0.5),
+    [],
+  );
   const totalPages = Math.ceil(shuffled.length / USERS_PER_PAGE);
   const pageUsers = shuffled.slice((page - 1) * USERS_PER_PAGE, page * USERS_PER_PAGE);
 
-  const changePage = (p: number) => {
-    if (p < 1 || p > totalPages) return;
-    setPage(p);
+  const changePage = (nextPage: number) => {
+    if (nextPage < 1 || nextPage > totalPages) return;
+    setPage(nextPage);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header onWithdraw={() => setWithdraw(true)} onBalance={() => setBalance(true)} />
-      <Slogan />
+    <div className="dv-home">
+      <HomeHeader onWithdraw={() => setWithdraw(true)} onBalance={() => setBalance(true)} />
 
-      <main className="mx-auto max-w-5xl px-3 py-4">
+      <section className="dv-home-slogan">
+        <p>
+          🌍 Foreigners are ready to pay for your time
+          <br />
+          <span>make atleast TZS 50,000 up to TZS 100,000 per day</span>
+        </p>
+      </section>
+
+      <main className="dv-home-main">
         <h1 className="sr-only">DreamVora Tanzania — Get paid to chat with foreigners</h1>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="dv-home-grid">
           {pageUsers.map((user) => (
-            <article
-              key={user.name}
-              className="relative rounded-2xl border border-border bg-card p-3 shadow-[var(--shadow-card)]"
-            >
-              <span className="absolute top-2 right-2 flex size-5 items-center justify-center rounded-full bg-success text-[10px] text-primary-foreground">
-                ✓
-              </span>
-              <div className="flex items-center gap-3">
-                <img
-                  src={user.img}
-                  alt={user.name}
-                  loading="lazy"
-                  className="size-14 rounded-full object-cover ring-2 ring-accent/40"
-                />
-                <div>
-                  <span className="flex items-center gap-1.5 text-sm font-bold text-foreground">
-                    <Flag code={user.country} /> {user.name}
+            <article key={user.name} className="dv-home-card">
+              <span className="dv-home-verified">✓</span>
+              <div className="dv-home-card-top">
+                <img src={user.img} alt={user.name} loading="lazy" className="dv-home-profile" />
+                <div className="dv-home-user-info">
+                  <span className="dv-home-user-name">
+                    <Flag code={user.country} size={22} /> {user.name}
                   </span>
-                  <div className="text-[11px] font-semibold text-success">● online</div>
-                  <div className="text-[11px] text-muted-foreground">
-                    <span className="text-highlight">★</span> {user.rating}
-                  </div>
+                  <div className="dv-home-status">● online</div>
+                  <div className="dv-home-rating">★ <span>{user.rating}</span></div>
                 </div>
               </div>
 
-              <div className="mt-3 space-y-1 rounded-xl bg-secondary p-2.5 text-[11px] text-secondary-foreground">
-                <div>
-                  <strong>CHAT TIME :</strong> {user.duration} minutes
-                </div>
-                <div>
-                  <strong>WANTS :</strong> {user.wants}
-                </div>
+              <div className="dv-home-details">
+                <div><strong>CHAT TIME :</strong> {user.duration} minutes</div>
+                <div><strong>WANTS :</strong> {user.wants}</div>
               </div>
 
-              <div className="mt-3 flex items-center justify-between gap-2">
+              <div className="dv-home-action">
                 <button
-                  onClick={() => navigate({ to: "/chat/$name", params: { name: user.name } })}
-                  className="rounded-xl bg-accent px-3 py-2 text-[11px] font-bold text-accent-foreground transition hover:opacity-90"
+                  className="dv-home-chat"
+                  onClick={() =>
+                    navigate({ to: "/chat/$name", params: { name: user.name } })
+                  }
                 >
                   💬 START CHAT
                 </button>
-                <div className="text-right">
-                  <div className="text-sm font-extrabold text-primary">
-                    TZS {user.money.toLocaleString()}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground">
-                    Earn USD {(user.money / 2500).toFixed(2)}
-                  </div>
+                <div className="dv-home-price">
+                  <div>TZS {user.money.toLocaleString()}</div>
+                  <small>Earn USD {(user.money / 2500).toFixed(2)}</small>
                 </div>
               </div>
             </article>
           ))}
         </div>
 
-        <div className="mt-5 flex items-center justify-center gap-4">
-          <button
-            onClick={() => changePage(page - 1)}
-            disabled={page === 1}
-            className="rounded-xl border border-border bg-card px-4 py-2 text-xs font-semibold disabled:opacity-40"
-          >
-            ← Prev
-          </button>
-          <span className="text-xs text-muted-foreground">
-            {page} / {totalPages}
-          </span>
-          <button
-            onClick={() => changePage(page + 1)}
-            disabled={page === totalPages}
-            className="rounded-xl border border-border bg-card px-4 py-2 text-xs font-semibold disabled:opacity-40"
-          >
-            Next →
-          </button>
-        </div>
+        {totalPages > 1 && (
+          <nav className="dv-home-pagination" aria-label="Pagination">
+            <button
+              className="dv-home-step-arrow"
+              onClick={() => changePage(page - 1)}
+              disabled={page === 1}
+              aria-label="Previous page"
+            >
+              ‹
+            </button>
+            <div className="dv-home-steps">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((number) => (
+                <span key={number} className="dv-home-step-wrap">
+                  <button
+                    className={`dv-home-step-circle ${
+                      number <= page ? "filled" : "outline"
+                    } ${number === page ? "current" : ""}`}
+                    onClick={() => changePage(number)}
+                    aria-label={`Page ${number}`}
+                    aria-current={number === page ? "page" : undefined}
+                  >
+                    {number}
+                  </button>
+                  {number < totalPages && (
+                    <span
+                      className={`dv-home-connector ${
+                        number < page ? "filled" : "outline"
+                      }`}
+                    />
+                  )}
+                </span>
+              ))}
+            </div>
+            <button
+              className="dv-home-step-arrow"
+              onClick={() => changePage(page + 1)}
+              disabled={page === totalPages}
+              aria-label="Next page"
+            >
+              ›
+            </button>
+          </nav>
+        )}
       </main>
 
-      <Footer onWithdraw={() => setWithdraw(true)} />
-      <DownloadAppPopup />
+      <HomeFooter
+        onWithdraw={() => setWithdraw(true)}
+        onContact={() => setContact(true)}
+      />
+
+      <button
+        className="dv-home-whatsapp"
+        onClick={() => setContact(true)}
+        aria-label="Customer assistance"
+      >
+        <span>💬 customer assistance</span>
+        <img
+          src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg"
+          alt=""
+        />
+      </button>
 
       <Modal
         open={withdraw}
@@ -145,9 +296,7 @@ function Index() {
         icon="👛"
         title="Withdrawal Unavailable"
       >
-        <p>
-          ⚠️ Unatakiwa <strong>ujisajili</strong> na ukamilishe chat ili uweze kupata fedha.
-        </p>
+        <p>⚠️ Unatakiwa <strong>ujisajili</strong> na ukamilishe chat ili uweze kupata fedha.</p>
         <p className="text-xs">📌 Kamilisha chat angalau moja na uweze kulipwa</p>
         <div className="space-y-2 pt-3">
           <RegisterButton label="Jisajili ili Kuendelea" />
@@ -155,16 +304,48 @@ function Index() {
         </div>
       </Modal>
 
-      <Modal open={balance} onClose={() => setBalance(false)} icon="👁" title="Ona Current Balance">
+      <Modal
+        open={balance}
+        onClose={() => setBalance(false)}
+        icon="👁"
+        title="Ona Current Balance"
+      >
         <p>
-          Ili uweze kuona balance yako halisi, unahitajika <strong>kujisajili</strong> kwenye akaunti
-          yako.
+          Ili uweze kuona balance yako halisi, unahitajika <strong>kujisajili</strong> kwenye akaunti yako.
         </p>
         <div className="space-y-2 pt-3">
           <RegisterButton />
           <BackButton onClick={() => setBalance(false)} label="Cancel" />
         </div>
       </Modal>
+
+      <Modal
+        open={contact}
+        onClose={() => setContact(false)}
+        icon="☎"
+        title="Contact Customer Support"
+      >
+        <p className="text-sm">Choose how you want to reach us</p>
+        <div className="dv-home-contact-options">
+          <a
+            href="https://whatsapp.com/channel/0029VbCV06a4Y9luvN14gz10"
+            target="_blank"
+            rel="noreferrer"
+          >
+            💬 <span><strong>Follow WhatsApp Channel</strong><small>Connect with our community and get support</small></span> →
+          </a>
+          <a href="sms:+255747741813?body=Habari,%20nina%20swali%20kuhusu%20dreamvora">
+            💬 <span><strong>Send SMS</strong><small>Send us a text message (Tuma Ujumbe)</small></span> →
+          </a>
+        </div>
+        <BackButton onClick={() => setContact(false)} label="Close" />
+      </Modal>
+
+      <div className="dv-home-download">
+        <button onClick={installApp}>
+          ⬇ <span>Download DreamVora App</span>
+        </button>
+      </div>
     </div>
   );
 }
