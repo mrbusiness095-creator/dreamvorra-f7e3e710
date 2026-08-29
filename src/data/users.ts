@@ -50,7 +50,6 @@ export const usersDatabase: ForeignUser[] = [
   { name: "Ethan", country: "PT", img: "https://i.pravatar.cc/150?img=39", money: 36500, duration: 38, rating: "4.7", wants: "Surfing & Water Adventure" },
 ];
 
-export const REGISTER_URL = "https://kozenasite.site/register?ref=Torento";
 
 export function findUser(name: string) {
   return usersDatabase.find((u) => u.name.toLowerCase() === name.toLowerCase());
