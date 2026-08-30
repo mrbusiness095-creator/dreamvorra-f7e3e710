@@ -282,17 +282,7 @@ function Index() {
         onContact={() => setContact(true)}
       />
 
-      <button
-        className="dv-home-whatsapp"
-        onClick={() => setContact(true)}
-        aria-label="Customer assistance"
-      >
-        <span>💬 customer assistance</span>
-        <img
-          src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg"
-          alt=""
-        />
-      </button>
+    
 
       <Modal
         open={withdraw}
