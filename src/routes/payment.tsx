@@ -121,7 +121,7 @@ function PaymentPage() {
     <div className="min-h-screen bg-k-slate-50 font-jost text-k-slate-800">
       <header className="flex items-center justify-between bg-k-green-900 px-6 py-4">
         <span className="text-lg font-extrabold tracking-tight text-white">
-          KOZENA <span className="text-k-amber-400">SITE</span>
+          DREAMVORA <span className="text-k-amber-400">SITE</span>
         </span>
         <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] tracking-wide text-k-green-100">MALIPO SALAMA</span>
       </header>
