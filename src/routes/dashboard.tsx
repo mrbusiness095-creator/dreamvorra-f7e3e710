@@ -5,7 +5,7 @@ import { usersDatabase } from "@/data/users";
 import { getAccount, logout, withdrawBalance, type DreamVoraAccount } from "@/lib/local-storage";
 
 export const Route = createFileRoute("/dashboard")({
-  head: () => ({ meta: [{ title: "Dashboard — KOZENA SITE" }] }),
+  head: () => ({ meta: [{ title: "Dashboard — DreamVora" }, { name: "robots", content: "noindex, nofollow" }] }),
   component: DashboardPage,
 });
 

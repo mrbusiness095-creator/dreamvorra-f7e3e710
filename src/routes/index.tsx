@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Flag, Modal, RegisterButton, BackButton } from "@/components/dv";
 import { usersDatabase } from "@/data/users";
 
@@ -9,7 +9,7 @@ const SITE_URL = "https://dreamvorra.site";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "DreamVora site|Official site" },
+      { title: "DreamVora site | Official site Get Paid to Chat with Foreigners Get Paid to Chat with Foreigners" },
       {
         name: "description",
         content:
@@ -22,7 +22,7 @@ export const Route = createFileRoute("/")({
       },
       { name: "author", content: "DreamVora" },
       { name: "robots", content: "index, follow" },
-      { property: "og:title", content: "DreamVora Tanzania | Get Paid to Chat with Foreigners" },
+      { property: "og:title", content: "DreamVora site | Official site Get Paid to Chat with Foreigners Get Paid to Chat with Foreigners" },
       {
         property: "og:description",
         content: "Connect, Learn, Earn with DreamVora Tanzania.",
@@ -163,10 +163,14 @@ function Index() {
     );
   };
 
-  const shuffled = useMemo(
-    () => [...usersDatabase].sort(() => Math.random() - 0.5),
-    [],
-  );
+  // Keep the SSR HTML deterministic. A random sort during render causes
+  // React hydration mismatches (#418) because the server and browser get
+  // different user orders. Shuffle only after the first client render.
+  const [shuffled, setShuffled] = useState(() => [...usersDatabase]);
+
+  useEffect(() => {
+    setShuffled([...usersDatabase].sort(() => Math.random() - 0.5));
+  }, []);
   const totalPages = Math.ceil(shuffled.length / USERS_PER_PAGE);
   const pageUsers = shuffled.slice((page - 1) * USERS_PER_PAGE, page * USERS_PER_PAGE);
 

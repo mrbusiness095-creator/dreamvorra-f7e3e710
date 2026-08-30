@@ -4,7 +4,7 @@ import logo from "@/assets/dreamvora-logo.png.asset.json";
 import { getAccount } from "@/lib/local-storage";
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "Ingia — KOZENA SITE" }] }),
+  head: () => ({ meta: [{ title: "Ingia — DreamVora" }, { name: "robots", content: "noindex, nofollow" }] }),
   component: LoginPage,
 });
 

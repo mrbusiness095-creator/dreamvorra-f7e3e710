@@ -77,7 +77,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "DreamVora Tanzania | Get Paid to Chat with Foreigners" },
+      { title: "DreamVora site | Official site Get Paid to Chat with Foreigners Get Paid to Chat with Foreigners" },
       {
         name: "description",
         content:
@@ -89,7 +89,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "DreamVora, DreamVora Tanzania, get paid to chat, chat with foreigners, online earning Tanzania, Swahili chat platform",
       },
-      { name: "robots", content: "index, follow" },
       { name: "theme-color", content: "#0d1b3e" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },

@@ -6,17 +6,18 @@ import { clearPendingChat, createAccount, getAccount, getPendingChat } from "@/l
 export const Route = createFileRoute("/register")({
   head: () => ({
     meta: [
-      { title: "Jisajili — KOZENA SITE" },
+      { title: "Jisajili — DreamVora" },
       {
         name: "description",
         content:
-          "Fungua akaunti yako ya KOZENA SITE kwa dakika moja, kisha lipia kwa USSD Push moja kwa moja kwenye simu yako.",
+          "Fungua akaunti yako ya DreamVora kwa dakika moja, kisha endelea na huduma za DreamVora.",
       },
-      { property: "og:title", content: "Jisajili — KOZENA SITE" },
+      { property: "og:title", content: "Jisajili — DreamVora" },
       {
         property: "og:description",
-        content: "Fungua akaunti yako ya KOZENA SITE kisha lipia kwa USSD Push.",
+        content: "Fungua akaunti yako ya DreamVora na uanze kutumia huduma zetu.",
       },
+      { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: RegisterPage,

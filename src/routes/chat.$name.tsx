@@ -5,7 +5,16 @@ import { findUser, firstMessageBroken } from "@/data/users";
 import { addEarnings, getAccount, setPendingChat, withdrawBalance, type DreamVoraAccount } from "@/lib/local-storage";
 
 export const Route = createFileRoute("/chat/$name")({
-  head: ({ params }) => ({ meta: [{ title: `Chat na ${params.name} | DreamVora Tanzania` }] }),
+  head: ({ params }) => ({
+    meta: [
+      { title: `Chat na ${params.name} | DreamVora Tanzania` },
+      { name: "description", content: `Chat with ${params.name} on DreamVora Tanzania.` },
+      { name: "robots", content: "index, follow" },
+    ],
+    links: [
+      { rel: "canonical", href: `https://dreamvorra.site/chat/${encodeURIComponent(params.name)}` },
+    ],
+  }),
   component: ChatPage,
 });
 
@@ -27,14 +36,14 @@ function ChatPage() {
   const navigate = useNavigate();
   const user = findUser(name);
   const storageKey = `dreamvora_chat_${name.toLowerCase()}`;
-  const [account, setAccount] = useState<DreamVoraAccount | null>(() => getAccount());
+  const [account, setAccount] = useState<DreamVoraAccount | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
   const [locked, setLocked] = useState(false);
   const [paymentNeeded, setPaymentNeeded] = useState(false);
   const [withdraw, setWithdraw] = useState(false);
   const [amount, setAmount] = useState("");
-  const [withdrawPhone, setWithdrawPhone] = useState(() => getAccount()?.phone ?? "");
+  const [withdrawPhone, setWithdrawPhone] = useState("");
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [withdrawNotice, setWithdrawNotice] = useState<string | null>(null);
   const myMessageCount = useMemo(() => messages.filter((m) => m.from === "me").length, [messages]);
@@ -42,6 +51,7 @@ function ChatPage() {
   useEffect(() => {
     const saved = getAccount();
     setAccount(saved);
+    setWithdrawPhone(saved?.phone ?? "");
     try {
       const raw = sessionStorage.getItem(storageKey);
       if (raw) { setMessages(JSON.parse(raw) as Message[]); return; }

@@ -7,14 +7,15 @@ import { clearPendingChat, getAccount, getPendingChat, markPaid, saveAccount } f
 export const Route = createFileRoute("/payment")({
   head: () => ({
     meta: [
-      { title: "Lipa — KOZENA SITE" },
+      { title: "Lipa — DreamVora" },
       {
         name: "description",
         content:
-          "Lipia ada ya KOZENA SITE kwa USSD Push. Weka namba yako ya simu na thibitisha malipo kwenye simu.",
+          "Kamilisha malipo ya DreamVora kwa USSD Push. Weka namba yako ya simu na thibitisha malipo kwenye simu.",
       },
-      { property: "og:title", content: "Lipa — KOZENA SITE" },
-      { property: "og:description", content: "Lipia kwa USSD Push moja kwa moja kwenye simu yako." },
+      { property: "og:title", content: "Lipa — DreamVora" },
+      { property: "og:description", content: "Lipia DreamVora kwa USSD Push moja kwa moja kwenye simu yako." },
+      { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: PaymentPage,
