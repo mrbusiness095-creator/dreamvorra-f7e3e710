@@ -598,9 +598,21 @@
 }
 
 
-/* SEO-friendly homepage introduction */\n.dv-home-seo-intro {\n  max-width: 900px;\n  margin: 0 auto 1.25rem;\n  padding: 0 1rem;
-  text-align: center;\n}\n.dv-home-seo-intro h1 {\n  margin: 0 0 0.5rem;
+/* SEO-friendly homepage introduction */
+.dv-home-seo-intro {
+  max-width: 900px;
+  margin: 0 auto 1.25rem;
+  padding: 0 1rem;
+  text-align: center;
+}
+.dv-home-seo-intro h1 {
+  margin: 0 0 0.5rem;
   font-size: clamp(1.35rem, 3vw, 2rem);
-  font-weight: 800;\n}\n.dv-home-seo-intro p {\n  margin: 0 auto;
-  max-width: 760px;\n  line-height: 1.6;
-  opacity: 0.9;\n}\n
+  font-weight: 800;
+}
+.dv-home-seo-intro p {
+  margin: 0 auto;
+  max-width: 760px;
+  line-height: 1.6;
+  opacity: 0.9;
+}
