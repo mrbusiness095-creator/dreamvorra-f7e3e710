@@ -596,3 +596,11 @@
   .dv-home-wallet { padding:6px 7px; }
   .dv-home-wallet-title { font-size:6px; }
 }
+
+
+/* SEO-friendly homepage introduction */\n.dv-home-seo-intro {\n  max-width: 900px;\n  margin: 0 auto 1.25rem;\n  padding: 0 1rem;
+  text-align: center;\n}\n.dv-home-seo-intro h1 {\n  margin: 0 0 0.5rem;
+  font-size: clamp(1.35rem, 3vw, 2rem);
+  font-weight: 800;\n}\n.dv-home-seo-intro p {\n  margin: 0 auto;
+  max-width: 760px;\n  line-height: 1.6;
+  opacity: 0.9;\n}\n

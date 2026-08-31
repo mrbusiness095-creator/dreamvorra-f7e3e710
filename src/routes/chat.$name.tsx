@@ -9,7 +9,7 @@ export const Route = createFileRoute("/chat/$name")({
     meta: [
       { title: `Chat na ${params.name} | DreamVora Tanzania` },
       { name: "description", content: `Chat with ${params.name} on DreamVora Tanzania.` },
-      { name: "robots", content: "index, follow" },
+      { name: "robots", content: "noindex, follow" },
     ],
     links: [
       { rel: "canonical", href: `https://dreamvorra.site/chat/${encodeURIComponent(params.name)}` },

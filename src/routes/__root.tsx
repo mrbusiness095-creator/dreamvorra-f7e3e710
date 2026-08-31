@@ -77,26 +77,30 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "DreamVora site | Official site Get Paid to Chat with Foreigners Get Paid to Chat with Foreigners" },
+      { title: "DreamVora | Get Paid to Chat with Foreigners" },
       {
         name: "description",
         content:
-          "DreamVora Tanzania: connect with foreigners, chat, learn languages and earn money online.",
+          "DreamVora is the official website to get paid to chat with foreigners, connect with people worldwide, share your culture, and earn money online.",
       },
       { name: "author", content: "DreamVora" },
       {
         name: "keywords",
         content:
-          "DreamVora, DreamVora Tanzania, get paid to chat, chat with foreigners, online earning Tanzania, Swahili chat platform",
+          "DreamVora, DreamVora Tanzania, DreamVora website, DreamVora official site, get paid to chat with foreigners, chat with foreigners, earn money online, Tanzania",
       },
       { name: "theme-color", content: "#0d1b3e" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-title", content: "DreamVora" },
-      { property: "og:title", content: "DreamVora Tanzania" },
-      { property: "og:description", content: "Connect, Learn, Earn with DreamVora Tanzania." },
+      { property: "og:title", content: "DreamVora | Get Paid to Chat with Foreigners" },
+      { property: "og:description", content: "Get paid to chat with foreigners, share your culture, connect with people worldwide, and earn money online with DreamVora." },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://dreamvorra.site/" },
+      { property: "og:site_name", content: "DreamVora" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "DreamVora | Get Paid to Chat with Foreigners" },
+      { name: "twitter:description", content: "Get paid to chat with foreigners and earn money online with DreamVora." },
     ],
     links: [
       {
