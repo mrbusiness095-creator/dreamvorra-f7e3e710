@@ -1,0 +1,15 @@
+{
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.dreamvorra.site"
+        }
+      ],
+      "destination": "https://dreamvorra.site/$1",
+      "permanent": true
+    }
+  ]
+}

@@ -47,6 +47,20 @@ function isH3SwallowedErrorBody(body: string): boolean {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      // Keep one canonical hostname for Google and users.
+      // www.dreamvorra.site -> dreamvorra.site is a permanent redirect.
+      const url = new URL(request.url);
+      if (url.hostname.toLowerCase() === "www.dreamvorra.site") {
+        url.hostname = "dreamvorra.site";
+        return new Response(null, {
+          status: 301,
+          headers: {
+            Location: url.toString(),
+            "Cache-Control": "public, max-age=86400",
+          },
+        });
+      }
+
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

@@ -1,3 +1,10 @@
 [build]
   command = "npm run build"
   publish = "dist/client"
+
+# Canonical host: keep the apex domain as the only indexable hostname.
+[[redirects]]
+  from = "https://www.dreamvorra.site/*"
+  to = "https://dreamvorra.site/:splat"
+  status = 301
+  force = true

@@ -11,9 +11,6 @@ export const Route = createFileRoute("/chat/$name")({
       { name: "description", content: `Chat with ${params.name} on DreamVora Tanzania.` },
       { name: "robots", content: "noindex, follow" },
     ],
-    links: [
-      { rel: "canonical", href: `https://dreamvorra.site/chat/${encodeURIComponent(params.name)}` },
-    ],
   }),
   component: ChatPage,
 });

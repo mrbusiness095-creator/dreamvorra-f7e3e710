@@ -1,8 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
-import { usersDatabase } from "@/data/users";
-
-// TODO: replace with your project URL once a project name or custom domain is set.
 const BASE_URL = "https://dreamvorra.site";
 
 export const Route = createFileRoute("/sitemap.xml")({
@@ -20,6 +17,7 @@ export const Route = createFileRoute("/sitemap.xml")({
             [
               `  <url>`,
               `    <loc>${BASE_URL}${e.path}</loc>`,
+              `    <lastmod>2026-09-01</lastmod>`,
               `    <changefreq>${e.changefreq}</changefreq>`,
               `    <priority>${e.priority}</priority>`,
               `  </url>`,

@@ -9,30 +9,31 @@ const SITE_URL = "https://dreamvorra.site";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "DreamVora | Get Paid to Chat with Foreigners" },
+      { title: "DreamVora | Get Paid to Chat with Foreigners in Tanzania" },
       {
         name: "description",
         content:
-          "DreamVora is the official website to get paid to chat with foreigners, connect with people worldwide, share your culture, learn languages, and earn money online.",
+          "DreamVora is the official website in Tanzania to chat with foreigners, connect with people worldwide, share your culture, learn languages, and earn money online.",
       },
       {
         name: "keywords",
         content:
-          "DreamVora, DreamVora Tanzania, DreamVora website, DreamVora official site, get paid to chat with foreigners, chat with foreigners, earn money online, Tanzania online jobs",
+          "DreamVora, DreamVora Tanzania, DreamVora official website, get paid to chat with foreigners, chat with foreigners, earn money online, Tanzania online jobs",
       },
       { name: "author", content: "DreamVora" },
       { name: "robots", content: "index, follow" },
-      { property: "og:title", content: "DreamVora | Get Paid to Chat with Foreigners" },
+      { property: "og:title", content: "DreamVora | Get Paid to Chat with Foreigners in Tanzania" },
       {
         property: "og:description",
         content: "Get paid to chat with foreigners, share your culture, and earn money online with DreamVora.",
       },
       { property: "og:image", content: `${SITE_URL}/assets/images/dreamvora-logo.png` },
       { property: "og:type", content: "website" },
+      { property: "og:locale", content: "en_TZ" },
       { property: "og:site_name", content: "DreamVora" },
       { property: "og:url", content: `${SITE_URL}/` },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "DreamVora | Get Paid to Chat with Foreigners" },
+      { name: "twitter:title", content: "DreamVora | Get Paid to Chat with Foreigners in Tanzania" },
       {
         name: "twitter:description",
         content: "Get paid to chat with foreigners, share your culture, and earn money online with DreamVora.",
@@ -88,10 +89,8 @@ function HomeHeader({
 
 function HomeFooter({
   onWithdraw,
-  onContact,
 }: {
   onWithdraw: () => void;
-  onContact: () => void;
 }) {
   return (
     <footer className="dv-home-footer">
@@ -115,12 +114,11 @@ function HomeFooter({
           <ul>
             <li><a href="/">🏠 Home</a></li>
             <li><button onClick={onWithdraw}>💰 Withdraw</button></li>
-            <li><button onClick={onContact}>💬 Contact Us</button></li>
           </ul>
         </div>
         <div>
-          <h4>Contact</h4>
-          <p>📱 <button onClick={onContact}>Contact Options</button></p>
+          <h4>About DreamVora</h4>
+          <p>Connect with foreigners, practise languages, share culture, and earn online.</p>
         </div>
       </div>
       <div className="dv-home-footer-bottom">© 2026 DreamVora · Connect, Learn, Earn.</div>
@@ -133,7 +131,6 @@ function Index() {
   const [page, setPage] = useState(1);
   const [withdraw, setWithdraw] = useState(false);
   const [balance, setBalance] = useState(false);
-  const [contact, setContact] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
 
   useEffect(() => {
@@ -196,7 +193,11 @@ function Index() {
       <main className="dv-home-main">
         <section className="dv-home-seo-intro" aria-labelledby="dreamvora-main-heading">
           <h1 id="dreamvora-main-heading">DreamVora — Get Paid to Chat with Foreigners</h1>
-          <p>DreamVora is the official website for connecting with foreigners, chatting, sharing your culture, learning languages, and earning money online.</p>
+          <p>
+            DreamVora is the official website in Tanzania for connecting with foreigners,
+            chatting, sharing your culture, learning languages, and earning money online.
+            Choose a conversation partner below to get started.
+          </p>
         </section>
         <div className="dv-home-grid">
           {pageUsers.map((user) => (
@@ -283,7 +284,6 @@ function Index() {
 
       <HomeFooter
         onWithdraw={() => setWithdraw(true)}
-        onContact={() => setContact(true)}
       />
 
     
@@ -315,28 +315,6 @@ function Index() {
           <RegisterButton />
           <BackButton onClick={() => setBalance(false)} label="Cancel" />
         </div>
-      </Modal>
-
-      <Modal
-        open={contact}
-        onClose={() => setContact(false)}
-        icon="☎"
-        title="Contact Customer Support"
-      >
-        <p className="text-sm">Choose how you want to reach us</p>
-        <div className="dv-home-contact-options">
-          <a
-            href="https://whatsapp.com/channel/0029VbCV06a4Y9luvN14gz10"
-            target="_blank"
-            rel="noreferrer"
-          >
-            💬 <span><strong>Follow WhatsApp Channel</strong><small>Connect with our community and get support</small></span> →
-          </a>
-          <a href="sms:+255747741813?body=Habari,%20nina%20swali%20kuhusu%20dreamvora">
-            💬 <span><strong>Send SMS</strong><small>Send us a text message (Tuma Ujumbe)</small></span> →
-          </a>
-        </div>
-        <BackButton onClick={() => setContact(false)} label="Close" />
       </Modal>
 
       <div className="dv-home-download">
