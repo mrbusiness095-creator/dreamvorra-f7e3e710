@@ -1,7 +1,7 @@
 {
-  "name": "DreamVora Tanzania",
+  "name": "DreamVora Site - Official DreamVora Website",
   "short_name": "DreamVora",
-  "description": "Get paid to chat with foreigners. Connect, Learn, Earn.",
+  "description": "Official DreamVora Site in Tanzania. Connect, Learn, Earn.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

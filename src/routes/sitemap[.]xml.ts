@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
+
 const BASE_URL = "https://dreamvorra.site";
 
 export const Route = createFileRoute("/sitemap.xml")({
@@ -13,13 +14,13 @@ export const Route = createFileRoute("/sitemap.xml")({
         const xml = [
           `<?xml version="1.0" encoding="UTF-8"?>`,
           `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`,
-          ...entries.map((e) =>
+          ...entries.map((entry) =>
             [
               `  <url>`,
-              `    <loc>${BASE_URL}${e.path}</loc>`,
+              `    <loc>${BASE_URL}${entry.path}</loc>`,
               `    <lastmod>2026-09-01</lastmod>`,
-              `    <changefreq>${e.changefreq}</changefreq>`,
-              `    <priority>${e.priority}</priority>`,
+              `    <changefreq>${entry.changefreq}</changefreq>`,
+              `    <priority>${entry.priority}</priority>`,
               `  </url>`,
             ].join("\n"),
           ),
@@ -27,9 +28,10 @@ export const Route = createFileRoute("/sitemap.xml")({
         ].join("\n");
 
         return new Response(xml, {
+          status: 200,
           headers: {
-            "Content-Type": "application/xml",
-            "Cache-Control": "public, max-age=3600",
+            "Content-Type": "application/xml; charset=utf-8",
+            "Cache-Control": "public, max-age=3600, s-maxage=3600",
           },
         });
       },

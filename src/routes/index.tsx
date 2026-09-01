@@ -9,23 +9,23 @@ const SITE_URL = "https://dreamvorra.site";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "DreamVora | Get Paid to Chat with Foreigners in Tanzania" },
+      { title: "DreamVora Site | Official DreamVora Website in Tanzania" },
       {
         name: "description",
         content:
-          "DreamVora is the official website in Tanzania to chat with foreigners, connect with people worldwide, share your culture, learn languages, and earn money online.",
+          "DreamVora Site is the official DreamVora website in Tanzania. DreamVora (also searched as Dream Vora) helps users connect with foreigners, chat, share culture, learn languages, and explore earning opportunities online.",
       },
       {
         name: "keywords",
         content:
-          "DreamVora, DreamVora Tanzania, DreamVora official website, get paid to chat with foreigners, chat with foreigners, earn money online, Tanzania online jobs",
+          "DreamVora, Dream Vora, DreamVora site, DreamVora website, DreamVora Tanzania, DreamVora official site, DreamVora official website, get paid to chat with foreigners, chat with foreigners, earn money online, Tanzania",
       },
       { name: "author", content: "DreamVora" },
       { name: "robots", content: "index, follow" },
-      { property: "og:title", content: "DreamVora | Get Paid to Chat with Foreigners in Tanzania" },
+      { property: "og:title", content: "DreamVora Site | Official DreamVora Website in Tanzania" },
       {
         property: "og:description",
-        content: "Get paid to chat with foreigners, share your culture, and earn money online with DreamVora.",
+        content: "Visit the official DreamVora Site to connect with foreigners, share your culture, learn languages, and explore online earning opportunities.",
       },
       { property: "og:image", content: `${SITE_URL}/assets/images/dreamvora-logo.png` },
       { property: "og:type", content: "website" },
@@ -33,15 +33,40 @@ export const Route = createFileRoute("/")({
       { property: "og:site_name", content: "DreamVora" },
       { property: "og:url", content: `${SITE_URL}/` },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "DreamVora | Get Paid to Chat with Foreigners in Tanzania" },
+      { name: "twitter:title", content: "DreamVora Site | Official DreamVora Website in Tanzania" },
       {
         name: "twitter:description",
-        content: "Get paid to chat with foreigners, share your culture, and earn money online with DreamVora.",
+        content: "Visit the official DreamVora Site to connect with foreigners, share your culture, learn languages, and explore online earning opportunities.",
       },
       { name: "twitter:image", content: `${SITE_URL}/assets/images/dreamvora-logo.png` },
       { name: "theme-color", content: "#0d1b3e" },
     ],
     links: [{ rel: "canonical", href: `${SITE_URL}/` }],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          name: "DreamVora Site",
+          alternateName: ["DreamVora", "Dream Vora", "DreamVora website", "DreamVora official site"],
+          url: `${SITE_URL}/`,
+          description:
+            "Official DreamVora Site in Tanzania for connecting with foreigners, chatting, cultural exchange, language learning, and online earning opportunities.",
+        }),
+      },
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          name: "DreamVora",
+          alternateName: ["DreamVora Site", "Dream Vora", "DreamVora official website"],
+          url: `${SITE_URL}/`,
+          logo: `${SITE_URL}/assets/images/dreamvora-logo.png`,
+        }),
+      },
+    ],
   }),
   component: Index,
 });
@@ -195,8 +220,10 @@ function Index() {
           <h1 id="dreamvora-main-heading">DreamVora — Get Paid to Chat with Foreigners</h1>
           <p>
             DreamVora is the official website in Tanzania for connecting with foreigners,
-            chatting, sharing your culture, learning languages, and earning money online.
-            Choose a conversation partner below to get started.
+            chatting, sharing your culture, learning languages, and exploring online earning opportunities.
+            If you are looking for the <strong>DreamVora site</strong>, <strong>Dream Vora</strong>, or the
+            <strong>DreamVora official website</strong>, you are in the right place. Choose a conversation
+            partner below to get started.
           </p>
         </section>
         <div className="dv-home-grid">

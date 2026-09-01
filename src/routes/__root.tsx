@@ -77,30 +77,30 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "DreamVora | Get Paid to Chat with Foreigners" },
+      { title: "DreamVora Site | Official DreamVora Website in Tanzania" },
       {
         name: "description",
         content:
-          "DreamVora is the official website to get paid to chat with foreigners, connect with people worldwide, share your culture, and earn money online.",
+          "DreamVora Site is the official DreamVora website in Tanzania. Connect with foreigners, chat, share culture, learn languages, and explore online earning opportunities.",
       },
       { name: "author", content: "DreamVora" },
       {
         name: "keywords",
         content:
-          "DreamVora, DreamVora Tanzania, DreamVora website, DreamVora official site, get paid to chat with foreigners, chat with foreigners, earn money online, Tanzania",
+          "DreamVora, Dream Vora, DreamVora site, DreamVora website, DreamVora Tanzania, DreamVora official site, DreamVora official website, get paid to chat with foreigners, chat with foreigners, earn money online, Tanzania",
       },
       { name: "theme-color", content: "#0d1b3e" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-title", content: "DreamVora" },
-      { property: "og:title", content: "DreamVora | Get Paid to Chat with Foreigners" },
-      { property: "og:description", content: "Get paid to chat with foreigners, share your culture, connect with people worldwide, and earn money online with DreamVora." },
+      { property: "og:title", content: "DreamVora Site | Official DreamVora Website in Tanzania" },
+      { property: "og:description", content: "Visit the official DreamVora Site in Tanzania to connect with foreigners, chat, share culture, learn languages, and explore online earning opportunities." },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://dreamvorra.site/" },
       { property: "og:site_name", content: "DreamVora" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "DreamVora | Get Paid to Chat with Foreigners" },
-      { name: "twitter:description", content: "Get paid to chat with foreigners and earn money online with DreamVora." },
+      { name: "twitter:title", content: "DreamVora Site | Official DreamVora Website in Tanzania" },
+      { name: "twitter:description", content: "Visit the official DreamVora Site in Tanzania to connect, learn, and explore online earning opportunities." },
     ],
     links: [
       {
