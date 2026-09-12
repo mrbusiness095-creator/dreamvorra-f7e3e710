@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import postgres from "postgres";
 import { createHmac, randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { PAYMENT_AMOUNT } from "./kozena.functions";
+import { usersDatabase } from "../data/users";
 
 const LIPA_NUMBER = "354136248";
 const AUTH_SECRET = process.env.DREAMVORA_AUTH_SECRET;
@@ -43,6 +44,18 @@ async function ensureSchema(sql: ReturnType<typeof postgres>) {
   `;
   await sql`CREATE INDEX IF NOT EXISTS dreamvora_payments_status_idx ON dreamvora_payments(status)`;
   await sql`CREATE INDEX IF NOT EXISTS dreamvora_payments_user_idx ON dreamvora_payments(user_id, submitted_at DESC)`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS dreamvora_chat_earnings (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES dreamvora_users(id) ON DELETE CASCADE,
+      chat_name TEXT NOT NULL,
+      message_block INTEGER NOT NULL,
+      amount INTEGER NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(user_id, chat_name, message_block)
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS dreamvora_chat_earnings_user_idx ON dreamvora_chat_earnings(user_id, created_at DESC)`;
 }
 
 function requireSecret() {
@@ -177,6 +190,113 @@ export const checkDreamVoraPayment = createServerFn({ method: "POST" })
       const payment = rows[0];
       return { status: Boolean(user.paid) ? "APPROVED" : String(payment?.status ?? "NONE"), paymentId: payment?.id ?? null, message: Boolean(user.paid) ? "Malipo yameidhinishwa." : "Bado tunasubiri uthibitisho." };
     } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
+  });
+
+/**
+ * Credits a completed chat block exactly once.
+ *
+ * A chat is paid after every 10 messages sent by the registered user.
+ * The unique constraint makes the credit idempotent, so refreshing or
+ * retrying the request cannot credit the same block twice.
+ */
+export const recordDreamVoraChatEarning = createServerFn({ method: "POST" })
+  .inputValidator((input: {
+    token: string;
+    chatName: string;
+    messageBlock: number;
+    amount: number;
+  }) => input)
+  .handler(async ({ data }) => {
+    const sql = db();
+    try {
+      await ensureSchema(sql);
+
+      const userId = verifyToken(data.token, "user");
+      const amount = Math.floor(Number(data.amount));
+      const messageBlock = Math.floor(Number(data.messageBlock));
+      const chatName = String(data.chatName ?? "").trim();
+
+      if (!chatName) throw new Error("Jina la chat halipo.");
+
+      const foreignUser = usersDatabase.find(
+        (item) => item.name.toLowerCase() === chatName.toLowerCase(),
+      );
+
+      if (!foreignUser) throw new Error("Mtu wa chat hakupatikana.");
+
+      if (!Number.isFinite(amount) || amount !== foreignUser.money) {
+        throw new Error("Kiasi cha malipo si sahihi.");
+      }
+
+      if (!Number.isInteger(messageBlock) || messageBlock < 1) {
+        throw new Error("Namba ya block ya chat si sahihi.");
+      }
+
+      const canonicalChatName = foreignUser.name;
+
+      const result = await sql.begin(async (tx) => {
+        const existing = await tx`
+          SELECT id, amount
+          FROM dreamvora_chat_earnings
+          WHERE user_id = ${userId}
+            AND chat_name = ${canonicalChatName}
+            AND message_block = ${messageBlock}
+          LIMIT 1
+        `;
+
+        if (existing[0]) {
+          const current = await tx`
+            SELECT balance FROM dreamvora_users WHERE id = ${userId} LIMIT 1
+          `;
+          return {
+            credited: false,
+            balance: Number(current[0]?.balance ?? 0),
+          };
+        }
+
+        const user = await tx`
+          SELECT paid, balance
+          FROM dreamvora_users
+          WHERE id = ${userId}
+          LIMIT 1
+        `;
+
+        if (!user[0]) throw new Error("Akaunti haijapatikana.");
+        if (!Boolean(user[0].paid)) {
+          throw new Error("Kamilisha malipo ya akaunti kwanza.");
+        }
+
+        const id = randomUUID();
+
+        await tx`
+          INSERT INTO dreamvora_chat_earnings
+            (id, user_id, chat_name, message_block, amount)
+          VALUES
+            (${id}, ${userId}, ${canonicalChatName}, ${messageBlock}, ${amount})
+        `;
+
+        const updated = await tx`
+          UPDATE dreamvora_users
+          SET balance = balance + ${amount}
+          WHERE id = ${userId}
+          RETURNING balance
+        `;
+
+        return {
+          credited: true,
+          balance: Number(updated[0]?.balance ?? 0),
+        };
+      });
+
+      return {
+        credited: result.credited,
+        balance: result.balance,
+        amount,
+        messageBlock,
+      };
+    } finally {
+      await sql.end({ timeout: 1 }).catch(() => undefined);
+    }
   });
 
 export const adminLoginDreamVora = createServerFn({ method: "POST" })

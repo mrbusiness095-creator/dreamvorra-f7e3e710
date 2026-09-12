@@ -66,9 +66,132 @@ function seedFromString(str: string) {
 
 export function firstMessageBroken(name: string, wants: string) {
   const templates = [
-    `Habari yako, jina yangu ni ${name}. Mimi kupenda kujifunza Kiswahili kuhusu ${wants}. Wewe unaweza kunifundisha mimi?`,
-    `Hodi hodi, mimi ni ${name}. Nataka kujua Kiswahili, hasa kuhusu ${wants}. Wewe unaweza kunisaidia?`,
-    `Habari, mimi jina ${name}. Mimi kupenda kujua kuhusu ${wants} kwa Kiswahili. Unaweza kunifundisha?`,
+    `Habari! Mimi ni ${name}. Nimefurahi kukuona hapa 😊. Ningependa kujifunza zaidi kuhusu ${wants}. Unaweza kunisaidia kwa Kiswahili?`,
+    `Hi! Mimi ni ${name} kutoka nje ya Tanzania. Ninaendelea kujifunza Kiswahili na ningependa tuzungumze kuhusu ${wants}. Uko tayari?`,
+    `Habari yako? Jina langu ni ${name}. Nimechagua kuzungumza kuhusu ${wants} kwa sababu inanivutia sana. Naomba unifundishe kidogo 😊.`,
   ];
   return templates[seedFromString(name + wants) % templates.length];
+}
+
+function pickReply(name: string, options: string[], key: string) {
+  return options[seedFromString(`${name}:${key}`) % options.length];
+}
+
+/**
+ * Local conversation engine.
+ *
+ * It is intentionally deterministic: the same conversation context does not
+ * create random/unpredictable messages, while different messages still get
+ * different, natural replies. No external AI API or API key is required.
+ */
+export function generateForeignerReply(
+  name: string,
+  wants: string,
+  userText: string,
+  messageNumber: number,
+) {
+  const text = userText.trim();
+  const lower = text.toLowerCase();
+  const key = `${messageNumber}:${lower}`;
+
+  if (/^(hi|hello|hey|mambo|habari|hujambo|shikamoo)\b/i.test(text)) {
+    return pickReply(name, [
+      `Habari! Nimefurahi umenijibu 😊. Siku yako inaendaje?`,
+      `Habari yako! 😊 Niko vizuri. Asante kwa kuendelea kuzungumza nami.`,
+      `Hey! Niko vizuri kabisa. Nimekuwa nikisubiri kusikia kutoka kwako 😊.`,
+    ], key);
+  }
+
+  if (/\b(jina|unaitwa|name)\b/i.test(lower)) {
+    return pickReply(name, [
+      `Naitwa ${name}. Na wewe nimefurahi kukufahamu. Jina lako lina maana gani?`,
+      `Mimi ni ${name} 😊. Ningependa pia kujua zaidi kuhusu wewe.`,
+    ], key);
+  }
+
+  if (/\b(wapi|country|nchi|tanzania|dar|arusha|zanzibar)\b/i.test(lower)) {
+    return pickReply(name, [
+      `Ninatokea nje ya Tanzania, lakini Tanzania imenivutia sana. Ningependa siku moja kutembelea Dar es Salaam na Zanzibar. Wewe unatokea eneo gani?`,
+      `Niko nje ya Tanzania kwa sasa. Nimekuwa nikisoma kuhusu maisha na utamaduni wa Tanzania, ndiyo maana nimependa kujifunza Kiswahili.`,
+    ], key);
+  }
+
+  if (/\b(unapenda|favorite|muziki|music|wimbo|song)\b/i.test(lower)) {
+    return pickReply(name, [
+      `Napenda muziki wenye melody nzuri, hasa nyimbo ninazoweza kusikiliza wakati wa kupumzika. Wewe unasikiliza muziki wa aina gani?`,
+      `Muziki unanivutia sana 😊. Ningependa kujua ni msanii gani wa Tanzania ungependekeza nisikilize.`,
+    ], key);
+  }
+
+  if (/\b(mpira|football|soccer|mchezo|sports)\b/i.test(lower)) {
+    return pickReply(name, [
+      `Ninapenda mpira kwa sababu ni rahisi kuunganisha watu kutoka nchi tofauti. Wewe ni shabiki wa timu gani?`,
+      `Hilo ni jambo zuri! Nimekuwa nikijaribu kufahamu zaidi kuhusu soka la Afrika Mashariki. Wewe hupenda kutazama ligi gani?`,
+    ], key);
+  }
+
+  if (/\b(kiswahili|swahili|kujifunza|learn|lugha)\b/i.test(lower)) {
+    return pickReply(name, [
+      `Ndiyo, Kiswahili ndicho ninachotaka kuboresha zaidi. Nikikosea sarufi, naomba unirekebishe kwa upole 😊.`,
+      `Ninajifunza taratibu. Neno gani la Kiswahili unadhani mtu anayejifunza anapaswa kulijua kwanza?`,
+      `Asante kwa kunifundisha. Napenda mazungumzo ya kawaida kwa sababu hunisaidia kukumbuka maneno kwa urahisi.`,
+    ], key);
+  }
+
+  if (/\b(asante|thanks|thank you)\b/i.test(lower)) {
+    return pickReply(name, [
+      `Karibu sana 😊. Na mimi ninafurahia mazungumzo yetu.`,
+      `Usijali kabisa. Nimefurahi kama mazungumzo haya yanakufurahisha pia.`,
+    ], key);
+  }
+
+  if (/\b(kwanini|kwa nini|why)\b/i.test(lower)) {
+    return `Kwa sababu ${wants.toLowerCase()} inanivutia, na pia nataka kupata mtazamo wa mtu anayeishi Tanzania. Nadhani kujifunza kupitia mazungumzo halisi ni rahisi zaidi 😊.`;
+  }
+
+  if (/\b(umri|age|miaka)\b/i.test(lower)) {
+    return pickReply(name, [
+      `Nina miaka 29. Lakini umri si jambo kubwa kwangu; ninapenda zaidi kujua watu na kusikia uzoefu wao. Wewe je?`,
+      `Niko kwenye miaka ya mwisho ya ishirini 😊. Na wewe una miaka mingapi?`,
+    ], key);
+  }
+
+  if (/\b(kazi|work|job|business|biashara)\b/i.test(lower)) {
+    return pickReply(name, [
+      `Kazi yangu inanifanya nikutane na watu wa tamaduni tofauti, ndiyo maana nimeanza kupenda kujifunza Kiswahili. Wewe unafanya kazi gani?`,
+      `Ninapenda sana kujifunza kuhusu kazi na biashara za watu wa Tanzania. Ni kitu gani unakipenda zaidi kwenye kazi yako?`,
+    ], key);
+  }
+
+  if (/\b(travel|safari|kutembelea|vacation|holiday)\b/i.test(lower)) {
+    return pickReply(name, [
+      `Ningependa sana kutembelea Tanzania siku moja. Zanzibar, Serengeti na Mlima Kilimanjaro viko kwenye orodha yangu 😊. Wewe ungependekeza nianzie wapi?`,
+      `Safari ndiyo kitu ninachokipenda sana. Ni sehemu gani Tanzania ungependa kumpeleka mgeni kwa mara ya kwanza?`,
+    ], key);
+  }
+
+  if (/\b(chakula|food|nyama|pilau|ugali|rice)\b/i.test(lower)) {
+    return pickReply(name, [
+      `Nimewahi kusikia kuhusu pilau na ugali, lakini sijui ladha halisi bado 😄. Wewe ungependekeza chakula gani kwa mtu anayekuja Tanzania kwa mara ya kwanza?`,
+      `Chakula cha Tanzania kinanivutia sana. Ningependa kujaribu chakula cha nyumbani badala ya kula hotelini tu.`,
+    ], key);
+  }
+
+  if (text.length <= 4) {
+    return pickReply(name, [
+      `Nimekupata 😊. Niambie zaidi kidogo, ningependa kusikia maoni yako.`,
+      `Haha, nimeelewa 😄. Endelea, ninafuatilia mazungumzo yetu.`,
+    ], key);
+  }
+
+  const general = [
+    `Hilo ni jambo la kuvutia sana. Sikuwahi kulitazama kwa mtazamo huo. Wewe ulianza kulipenda lini?`,
+    `Nimekuelewa 😊. Ningependa kujua zaidi kuhusu hilo, hasa kwa sababu ${wants.toLowerCase()} ni sehemu ya kile ninachotaka kujifunza.`,
+    `Umeeleza vizuri. Kwa upande wangu, napenda kusikia uzoefu wa watu wa Tanzania kwa sababu unanisaidia kuelewa utamaduni vizuri zaidi.`,
+    `Interesting! 😊 Naona mazungumzo yetu yanaenda vizuri. Kama ungekuwa unanifundisha jambo moja kuhusu Tanzania leo, lingekuwa lipi?`,
+    `Sawa, nimekupata. Mimi bado najifunza Kiswahili, kwa hiyo mazungumzo kama haya yananisaidia sana. Unaweza kunipa mfano mwingine?`,
+    `Hilo limenifanya nitabasamu 😄. Asante kwa kunieleza. Hebu niambie, wewe binafsi unaonaje hilo?`,
+  ];
+
+  return pickReply(name, general, key);
 }
