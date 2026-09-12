@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
-export const PAYMENT_AMOUNT = 14500;
+export const PAYMENT_AMOUNT = 15000;
 export const PAYMENT_CURRENCY = "TZS";
 
 const MOBILIPA_BASE = "https://api.mobilipa.store";
