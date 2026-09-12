@@ -2,7 +2,8 @@ import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router"
 import { useEffect, useMemo, useState } from "react";
 import { BackButton, Flag, Header, Modal } from "@/components/dv";
 import { findUser, firstMessageBroken } from "@/data/users";
-import { addEarnings, getAccount, setPendingChat, withdrawBalance, type DreamVoraAccount } from "@/lib/local-storage";
+import { addEarnings, getAccount, getSession, saveServerAccount, setPendingChat, withdrawBalance, type DreamVoraAccount } from "@/lib/local-storage";
+import { getDreamVoraAccount } from "@/lib/dreamvora.server";
 
 export const Route = createFileRoute("/chat/$name")({
   head: ({ params }) => ({
@@ -46,9 +47,16 @@ function ChatPage() {
   const myMessageCount = useMemo(() => messages.filter((m) => m.from === "me").length, [messages]);
 
   useEffect(() => {
-    const saved = getAccount();
-    setAccount(saved);
-    setWithdrawPhone(saved?.phone ?? "");
+    const token = getSession();
+    if (token) {
+      void getDreamVoraAccount({ data: { token } }).then((result) => {
+        saveServerAccount(result.account);
+        setAccount({ ...result.account, withdrawals: getAccount()?.withdrawals ?? [] });
+        setWithdrawPhone(result.account.phone);
+      }).catch(() => setAccount(null));
+    } else {
+      setAccount(null);
+    }
     try {
       const raw = sessionStorage.getItem(storageKey);
       if (raw) { setMessages(JSON.parse(raw) as Message[]); return; }

@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
-import { checkPaymentStatus, startPayment, PAYMENT_AMOUNT } from "@/lib/kozena.functions";
-import { clearPendingChat, getAccount, getPendingChat, markPaid, saveAccount } from "@/lib/local-storage";
+import { useEffect, useState, type ReactNode } from "react";
+import { PAYMENT_AMOUNT } from "@/lib/kozena.functions";
+import { checkDreamVoraPayment, submitDreamVoraPayment } from "@/lib/dreamvora.server";
+import { clearPendingChat, getAccount, getPendingChat, getSession, markPaid } from "@/lib/local-storage";
 
 export const Route = createFileRoute("/payment")({
   head: () => ({
@@ -11,28 +11,27 @@ export const Route = createFileRoute("/payment")({
       {
         name: "description",
         content:
-          "Kamilisha malipo ya DreamVora kwa USSD Push. Weka namba yako ya simu na thibitisha malipo kwenye simu.",
+          "Kamilisha malipo ya DreamVora kwa Lipa Namba kupitia mitandao ya simu Tanzania.",
       },
       { property: "og:title", content: "Lipa — DreamVora" },
-      { property: "og:description", content: "Lipia DreamVora kwa USSD Push moja kwa moja kwenye simu yako." },
+      {
+        property: "og:description",
+        content: "Lipia DreamVora kwa Lipa Namba kupitia Vodacom, Mixx by Yas, Airtel au Halopesa.",
+      },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: PaymentPage,
 });
 
-type Phase = "form" | "waiting" | "failed";
-
 function PaymentPage() {
   const navigate = useNavigate();
-  const createOrder = useServerFn(startPayment);
-  const pollStatus = useServerFn(checkPaymentStatus);
   const [ready, setReady] = useState(false);
-  const [phone, setPhone] = useState("");
-  const [phase, setPhase] = useState<Phase>("form");
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [pushUnavailable, setPushUnavailable] = useState(false);
+  const [phoneUsed, setPhoneUsed] = useState("");
+  const [requestStatus, setRequestStatus] = useState<"idle" | "pending" | "approved" | "rejected">("idle");
+  const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const account = getAccount();
@@ -40,6 +39,7 @@ function PaymentPage() {
       navigate({ to: "/register" });
       return;
     }
+
     if (account.paid) {
       const pendingChat = getPendingChat();
       if (pendingChat) {
@@ -50,135 +50,291 @@ function PaymentPage() {
       }
       return;
     }
-    setPhone(account.phone);
+
+    setPhoneUsed(account.phone);
     setReady(true);
-    return () => {
-      if (timer.current) clearInterval(timer.current);
-    };
+
+    const token = getSession();
+    if (token) {
+      void checkDreamVoraPayment({ data: { token } }).then((result) => {
+        setRequestStatus(result.status === "APPROVED" ? "approved" : result.status === "REJECTED" ? "rejected" : result.status === "PENDING" ? "pending" : "idle");
+        if (result.status === "APPROVED") markPaid();
+      }).catch(() => undefined);
+    }
   }, [navigate]);
 
-  async function onSubmit(e: React.FormEvent) {
+  async function submitPaymentRequest(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    setPhase("waiting");
-    const account = getAccount();
-    if (!account) {
-      navigate({ to: "/register" });
-      return;
-    }
+    setPaymentMessage(null);
+    const token = getSession();
+    if (!token) { navigate({ to: "/login" }); return; }
+    setSubmitting(true);
     try {
-      const order = await createOrder({
-        data: {
-          phone,
-          buyerName: account.name,
-          buyerEmail: account.email,
-        },
-      });
-      saveAccount({ ...account, phone });
-      setMessage(order.message);
-      let attempts = 0;
-      timer.current = setInterval(async () => {
-        attempts += 1;
-        try {
-          const res = await pollStatus({ data: { orderId: order.order_id } });
-          if (res.payment_status === "COMPLETED") {
-            if (timer.current) clearInterval(timer.current);
-            markPaid();
-            const pendingChat = getPendingChat();
-            if (pendingChat) {
-              clearPendingChat();
-              navigate({ to: "/chat/$name", params: { name: pendingChat } });
-            } else {
-              navigate({ to: "/dashboard" });
-            }
-            return;
-          }
-          if (["CANCELLED", "USERCANCELLED", "REJECTED"].includes(res.payment_status)) {
-            if (timer.current) clearInterval(timer.current);
-            setPhase("failed");
-            setError("Malipo hayakukamilika. Tafadhali jaribu tena.");
-          }
-        } catch {
-          /* keep polling */
-        }
-        if (attempts >= 40) {
-          if (timer.current) clearInterval(timer.current);
-          setPhase("failed");
-          setError("Muda umeisha bila kupokea uthibitisho wa malipo. Jaribu tena.");
-        }
-      }, 4000);
+      const result = await submitDreamVoraPayment({ data: { token, phoneUsed } });
+      setRequestStatus(result.status === "APPROVED" ? "approved" : "pending");
+      setPaymentMessage(result.message);
     } catch (err) {
-      setPhase("failed");
-      setError(err instanceof Error ? err.message : "Imeshindikana kuanzisha malipo.");
-    }
+      setPaymentMessage(err instanceof Error ? err.message : "Ombi la malipo limeshindikana.");
+    } finally { setSubmitting(false); }
   }
 
+  function handlePayNow() {
+    setPushUnavailable(true);
+
+    window.setTimeout(() => {
+      setPushUnavailable(false);
+      document.getElementById("lipa-namba")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 1700);
+  }
+
+  useEffect(() => {
+    if (requestStatus !== "pending") return;
+    const token = getSession();
+    if (!token) return;
+    const timer = window.setInterval(() => {
+      void checkDreamVoraPayment({ data: { token } }).then((result) => {
+        if (result.status === "APPROVED") {
+          markPaid();
+          setRequestStatus("approved");
+          const pendingChat = getPendingChat();
+          if (pendingChat) { clearPendingChat(); navigate({ to: "/chat/$name", params: { name: pendingChat } }); }
+          else navigate({ to: "/dashboard" });
+        } else if (result.status === "REJECTED") {
+          setRequestStatus("rejected");
+          setPaymentMessage("Ombi la malipo limekataliwa. Hakikisha malipo yalitumwa kwenye Lipa Namba 354136248 kisha tuma ombi tena.");
+        }
+      }).catch(() => undefined);
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [requestStatus, navigate]);
+
   if (!ready) {
-    return <main className="flex min-h-screen items-center justify-center bg-k-slate-50 font-jost text-k-slate-500">Inapakia...</main>;
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-k-slate-50 font-jost text-k-slate-500">
+        Inapakia...
+      </main>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-k-slate-50 font-jost text-k-slate-800">
-      <header className="flex items-center justify-between bg-k-green-900 px-6 py-4">
-        <span className="text-lg font-extrabold tracking-tight text-white">
-          DREAMVORA <span className="text-k-amber-400">SITE</span>
+    <div className="payment-page min-h-screen bg-k-slate-50 font-jost text-k-slate-800">
+      {pushUnavailable && (
+        <div className="payment-modal-backdrop" role="alertdialog" aria-modal="true" aria-label="USSD Push haipatikani">
+          <div className="payment-modal">
+            <div className="payment-modal-icon">!</div>
+            <h2>NJIA YA USSD PUSH HAIPATIKANI KWA SASA</h2>
+            <p>TUMIA LIPA NAMBA</p>
+            <div className="payment-modal-loader" aria-hidden="true" />
+          </div>
+        </div>
+      )}
+
+      <header className="payment-header-bar">
+        <span className="payment-brand">
+          DREAMVORA <span>SITE</span>
         </span>
-        <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] tracking-wide text-k-green-100">MALIPO SALAMA</span>
+        <span className="payment-secure-pill">MALIPO SALAMA</span>
       </header>
 
-      <main className="mx-auto max-w-xl px-4 pb-16 pt-7">
-        <div className="mb-6 flex gap-3 rounded-2xl border-[1.5px] border-k-red-300 bg-k-red-50 p-4">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-k-red-100 text-k-red-600">🛡</div>
+      <main className="payment-main">
+        <div className="payment-security">
+          <div className="payment-security-icon">🛡</div>
           <div>
-            <h2 className="text-xs font-bold tracking-widest text-k-red-600">LINDA PESA YAKO</h2>
-            <p className="mt-1 text-sm leading-relaxed text-k-red-900">
-              Lipia kupitia mfumo huu pekee.
-              Malipo nje ya mfumo huu ni batili na hayatakubaliwa.
+            <h2>LINDA PESA YAKO</h2>
+            <p>
+              Lipia kupitia mfumo huu pekee. Malipo nje ya mfumo huu ni batili na hayatakubaliwa.
             </p>
           </div>
         </div>
 
-        <div className="mb-5 flex gap-2">
-          <span className="flex items-center gap-2 rounded-full border-[1.5px] border-k-green-800 bg-k-green-800 px-4 py-2 text-[13px] text-white">🇹🇿 Tanzania</span>
-        </div>
+        <div className="payment-country-pill">🇹🇿 Tanzania</div>
 
-        <section className="mb-5 overflow-hidden rounded-3xl border-[1.5px] border-k-slate-200 bg-white">
-          <div className="flex items-center gap-3 border-b border-k-slate-100 px-5 py-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-k-green-50 text-k-green-700">⚡</div>
+        <section className="payment-summary-card">
+          <div className="payment-summary-head">
+            <div className="payment-summary-icon">⚡</div>
             <div>
-              <h3 className="font-semibold">Tanzania</h3>
-              <p className="text-xs text-k-slate-500">Lipia moja kwa moja kwa USSD Push</p>
+              <h3>Tanzania</h3>
+              <p>Lipa kwa Lipa Namba</p>
             </div>
           </div>
-          <div className="px-5 py-5">
-            <div className="mb-4 flex items-center justify-between rounded-2xl bg-k-green-50 px-4 py-3">
-              <span className="text-sm text-k-green-700">Kiasi cha kulipa</span>
-              <span className="text-lg font-bold text-k-green-900">{PAYMENT_AMOUNT.toLocaleString()} TZS</span>
-            </div>
 
-            {error && <div className="mb-4 rounded-xl border border-k-red-300 bg-k-red-50 px-4 py-3 text-sm text-k-red-900">{error}</div>}
+          <div className="payment-amount-row">
+            <span>Kiasi cha kulipa</span>
+            <strong>{PAYMENT_AMOUNT.toLocaleString()} TZS</strong>
+          </div>
 
-            {phase === "waiting" ? (
-              <div className="rounded-2xl border-[1.5px] border-k-slate-200 p-6 text-center">
-                <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-k-green-100 border-t-k-green-700" />
-                <p className="font-semibold text-k-green-900">Subiri uthibitisho...</p>
-                <p className="mt-1 text-sm text-k-slate-500">
-                  {message ?? "Push USSD imetumwa kwenye simu yako."} Ingiza namba yako ya siri kuthibitisha malipo.
-                </p>
-              </div>
-            ) : (
-              <form onSubmit={onSubmit}>
-                <label className="mb-1 block text-xs font-bold text-k-slate-500" htmlFor="tz-phone">Namba ya simu</label>
-                <div className="mb-4 flex items-center overflow-hidden rounded-xl border-[1.5px] border-k-slate-200 bg-k-slate-50">
-                  <span className="border-r border-k-slate-200 px-3 py-3 text-sm text-k-slate-500">🇹🇿 +255</span>
-                  <input id="tz-phone" type="tel" required maxLength={12} placeholder="06XXXXXXXX" value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))} className="w-full bg-transparent px-3 py-3 text-sm outline-none" />
-                </div>
-                <button type="submit" className="k-btn-green hover:opacity-90">🔒 LIPA SASA</button>
-              </form>
-            )}
+          <button type="button" onClick={handlePayNow} className="payment-pay-button">
+            🔒 LIPA SASA
+          </button>
+        </section>
+
+        <section id="lipa-namba" className="ussd-card" aria-labelledby="ussd-heading">
+          <div className="ussd-header">
+            <span id="ussd-heading">NJIA ZA MALIPO / USSD MENU</span>
+            <div className="ussd-divider" />
+          </div>
+
+          <div className="ussd-intro">
+            <h2>Chagua mtandao wako</h2>
+            <p>Weka Lipa Namba <strong>354136248</strong> kulipia {PAYMENT_AMOUNT.toLocaleString()} TZS.</p>
+          </div>
+
+          <Operator
+            id="op-voda"
+            logo="https://brandlogos.net/wp-content/uploads/2025/04/vodacom-logo_brandlogos.net_4uzfe.png"
+            alt="Vodacom"
+            name="Vodacom M-Pesa"
+            ussd="*150*00#"
+            highlightIndex={3}
+            steps={[
+              <>Bonyeza <strong>*150*00#</strong></>,
+              <>Chagua <strong>Lipa kwa M-PESA</strong></>,
+              <>Chagua <strong>LIPA KWA SIMU HALOPESA</strong></>,
+              <>Weka LIPA NAMBA: <CopyNumber /></>,
+              <>Weka kiasi <strong>{PAYMENT_AMOUNT.toLocaleString()} TZS</strong></>,
+              <>Weka namba ya siri</>,
+            ]}
+          />
+
+          <Operator
+            id="op-tigo"
+            logo="https://www.uminolan.co.tz/assets/images/supa-agent/mixx-by-yas-seeklogo2.png"
+            alt="Mixx by Yas"
+            name="Mixx by Yas"
+            ussd="*150*01#"
+            highlightIndex={4}
+            steps={[
+              <>Bonyeza <strong>*150*01#</strong></>,
+              <>Chagua <strong>Lipa kwa simu</strong></>,
+              <>Chagua <strong>Kwenda mitandao mingine</strong></>,
+              <>Chagua <strong>HALOPESA</strong></>,
+              <>Weka LIPA NAMBA: <CopyNumber /></>,
+              <>Weka kiasi <strong>{PAYMENT_AMOUNT.toLocaleString()} TZS</strong></>,
+              <>Weka namba ya siri</>,
+            ]}
+          />
+
+          <Operator
+            id="op-airtel"
+            logo="https://nikulipe.com/wp-content/uploads/2022/09/Airtel_logo_PNG1.png"
+            alt="Airtel"
+            name="Airtel Money"
+            ussd="*150*60#"
+            highlightIndex={5}
+            steps={[
+              <>Bonyeza <strong>*150*60#</strong></>,
+              <>Chagua <strong>Lipia Bili</strong></>,
+              <>Chagua <strong>LIPA KWA SIMU (MITANDAO YOTE)</strong></>,
+              <>Chagua <strong>LIPA KWA HALOPESA</strong></>,
+              <>Weka kiasi <strong>{PAYMENT_AMOUNT.toLocaleString()} TZS</strong></>,
+              <>Ingiza kumbukumbu ya malipo: <CopyNumber /></>,
+              <>Ingiza namba ya siri kuruhusu muamala</>,
+            ]}
+          />
+
+          <Operator
+            id="op-halo"
+            logo="https://halopesa.co.tz/images/applications-system.png"
+            alt="Halopesa"
+            name="Halopesa"
+            ussd="*150*88#"
+            highlightIndex={3}
+            steps={[
+              <>Bonyeza <strong>*150*88#</strong></>,
+              <>Chagua namba <strong>(5) Lipia Bidhaa</strong></>,
+              <>Chagua <strong>HALOPESA</strong></>,
+              <>Weka namba ya malipo: <CopyNumber /></>,
+              <>Weka kiasi <strong>{PAYMENT_AMOUNT.toLocaleString()} TZS</strong></>,
+              <>Ingiza namba ya siri</>,
+              <>Bonyeza <strong>1</strong> kuruhusu muamala</>,
+            ]}
+          />
+
+          <div className="payment-verify-box">
+            <h3>Thibitisha kuwa umelipia</h3>
+            <p>Baada ya kutuma TZS {PAYMENT_AMOUNT.toLocaleString()} kwenye Lipa Namba <strong>354136248</strong>, weka namba iliyotumika kulipia hapa chini.</p>
+            <form onSubmit={submitPaymentRequest} className="payment-verify-form">
+              <input value={phoneUsed} onChange={(e) => setPhoneUsed(e.target.value.replace(/[^0-9+]/g, ""))} inputMode="tel" placeholder="06XXXXXXXX" required />
+              <button type="submit" disabled={submitting || requestStatus === "pending"}>{submitting ? "Inatuma..." : requestStatus === "pending" ? "INASUBIRI UTHIBITISHO" : "NIMELIPIA"}</button>
+            </form>
+            {requestStatus === "pending" && <div className="payment-status pending">⏳ Ombi limepokelewa. Admin anakagua malipo yako.</div>}
+            {requestStatus === "approved" && <div className="payment-status approved">✓ Malipo yameidhinishwa. Tunaelekeza kwenye Chat...</div>}
+            {requestStatus === "rejected" && <div className="payment-status rejected">✕ Ombi limekataliwa. Unaweza kutuma ombi jipya baada ya kuhakikisha malipo.</div>}
+            {paymentMessage && requestStatus === "idle" && <div className="payment-status pending">{paymentMessage}</div>}
           </div>
         </section>
       </main>
     </div>
+  );
+}
+
+type OperatorProps = {
+  id: string;
+  logo: string;
+  alt: string;
+  name: string;
+  ussd: string;
+  steps: ReactNode[];
+  highlightIndex: number;
+};
+
+function Operator({ id, logo, alt, name, ussd, steps, highlightIndex }: OperatorProps) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className={`operator-item ${open ? "is-open" : ""}`} id={id}>
+      <button type="button" className="operator-toggle" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
+        <div className="operator-logo-wrap">
+          <img src={logo} alt={alt} loading="lazy" />
+        </div>
+        <div className="operator-copy">
+          <div className="operator-name">{name}</div>
+          <div className="operator-ussd">{ussd}</div>
+        </div>
+        <svg className="chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      <div className="operator-steps" hidden={!open}>
+        <ul className="steps-list">
+          {steps.map((step, index) => (
+            <li className={`step-row ${index === highlightIndex ? "highlight" : ""}`} key={`${id}-${index}`}>
+              <span className="step-num">{index + 1}</span>
+              <span>{step}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="biz-tag">
+          Jina la Biashara: <strong>ASSERT BRIDGE</strong>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CopyNumber() {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText("354136248");
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      // Clipboard may be unavailable on some browsers.
+    }
+  }
+
+  return (
+    <span className="copy-number-wrap">
+      <span className="step-value">354136248</span>
+      <button type="button" className="copy-btn" onClick={(event) => { event.stopPropagation(); void copy(); }}>
+        {copied ? "Copied" : "Copy"}
+      </button>
+    </span>
   );
 }

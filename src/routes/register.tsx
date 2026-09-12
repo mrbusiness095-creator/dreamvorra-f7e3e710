@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import logo from "@/assets/dreamvora-logo.png.asset.json";
-import { clearPendingChat, createAccount, getAccount, getPendingChat } from "@/lib/local-storage";
+import { clearPendingChat, getAccount, getPendingChat, saveServerAccount, saveSession } from "@/lib/local-storage";
+import { registerDreamVoraAccount } from "@/lib/dreamvora.server";
 
 export const Route = createFileRoute("/register")({
   head: () => ({
@@ -72,22 +73,16 @@ function RegisterPage() {
       return;
     }
     setLoading(true);
-    const existing = getAccount();
-    if (existing && existing.username.toLowerCase() === form.username.toLowerCase()) {
-      setError("Username au email tayari imetumika.");
+    try {
+      const result = await registerDreamVoraAccount({ data: { name: form.name, username: form.username, phone: form.phone, email: form.email, country: form.country, password: form.password } });
+      saveSession(result.token);
+      saveServerAccount(result.account);
+      navigate({ to: "/payment" });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Usajili umeshindikana.");
+    } finally {
       setLoading(false);
-      return;
     }
-    createAccount({
-      name: form.name,
-      username: form.username,
-      phone: form.phone,
-      email: form.email,
-      country: form.country,
-      password: form.password,
-    });
-    setLoading(false);
-    navigate({ to: "/payment" });
   }
 
   return (
