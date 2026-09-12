@@ -104,7 +104,7 @@ function PaymentPage() {
           else navigate({ to: "/dashboard" });
         } else if (result.status === "REJECTED") {
           setRequestStatus("rejected");
-          setPaymentMessage("Ombi la malipo limekataliwa. Hakikisha malipo yalitumwa kwenye Lipa Namba 354136248 kisha tuma ombi tena.");
+          setPaymentMessage("Ombi la malipo limekataliwa. Hakikisha malipo yalitumwa kwenye Lipa Namba 251161660 kisha tuma ombi tena.");
         }
       }).catch(() => undefined);
     }, 5000);
@@ -179,7 +179,7 @@ function PaymentPage() {
 
           <div className="ussd-intro">
             <h2>Chagua mtandao wako</h2>
-            <p>Weka Lipa Namba <strong>354136248</strong> kulipia {PAYMENT_AMOUNT.toLocaleString()} TZS.</p>
+            <p>Weka Lipa Namba <strong>251161660</strong> kulipia {PAYMENT_AMOUNT.toLocaleString()} TZS.</p>
           </div>
 
           <Operator
@@ -255,7 +255,7 @@ function PaymentPage() {
 
           <div className="payment-verify-box">
             <h3>Thibitisha kuwa umelipia</h3>
-            <p>Baada ya kutuma TZS {PAYMENT_AMOUNT.toLocaleString()} kwenye Lipa Namba <strong>354136248</strong>, weka namba iliyotumika kulipia hapa chini.</p>
+            <p>Baada ya kutuma TZS {PAYMENT_AMOUNT.toLocaleString()} kwenye Lipa Namba <strong>251161660</strong>, weka namba iliyotumika kulipia hapa chini.</p>
             <form onSubmit={submitPaymentRequest} className="payment-verify-form">
               <input value={phoneUsed} onChange={(e) => setPhoneUsed(e.target.value.replace(/[^0-9+]/g, ""))} inputMode="tel" placeholder="06XXXXXXXX" required />
               <button type="submit" disabled={submitting || requestStatus === "pending"}>{submitting ? "Inatuma..." : requestStatus === "pending" ? "INASUBIRI UTHIBITISHO" : "NIMELIPIA"}</button>
@@ -321,7 +321,7 @@ function CopyNumber() {
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText("354136248");
+      await navigator.clipboard.writeText("251161660");
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1400);
     } catch {
@@ -331,7 +331,7 @@ function CopyNumber() {
 
   return (
     <span className="copy-number-wrap">
-      <span className="step-value">354136248</span>
+      <span className="step-value">251161660</span>
       <button type="button" className="copy-btn" onClick={(event) => { event.stopPropagation(); void copy(); }}>
         {copied ? "Copied" : "Copy"}
       </button>
