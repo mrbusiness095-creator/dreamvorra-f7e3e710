@@ -116,7 +116,7 @@ function DashboardPage() {
                 <div><strong>WANTS :</strong> {user.wants}</div>
               </div>
               <button
-                onClick={() => navigate({ to: "/chat/$name", params: { name: user.name } })}
+                onClick={() => navigate({ to: "/chat/$name", params: { name: encodeURIComponent(user.name) } })}
                 className="mt-3 w-full rounded-xl bg-k-indigo px-3 py-2 text-[11px] font-bold text-white"
               >
                 💬 START CHAT
