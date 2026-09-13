@@ -5,6 +5,18 @@ import { clearPendingChat, getAccount, getPendingChat, saveServerAccount, saveSe
 import { registerDreamVoraAccount } from "@/lib/dreamvora.server";
 
 export const Route = createFileRoute("/register")({
+  errorComponent: () => (
+    <main className="flex min-h-screen items-center justify-center bg-background px-6 text-center">
+      <div className="max-w-sm">
+        <p className="text-lg font-bold text-foreground">Usajili haukuweza kufunguka</p>
+        <p className="mt-2 text-sm text-muted-foreground">Jaribu tena. Kama bado haifunguki, rudi mwanzo kisha uguse Jisajili tena.</p>
+        <div className="mt-4 flex justify-center gap-2">
+          <button onClick={() => window.location.reload()} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">Jaribu tena</button>
+          <Link to="/" className="rounded-xl border border-border bg-card px-4 py-2 text-sm font-bold text-foreground">Go home</Link>
+        </div>
+      </div>
+    </main>
+  ),
   head: () => ({
     meta: [
       { title: "Jisajili — DreamVora" },
@@ -68,13 +80,19 @@ function RegisterPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const name = form.name.trim();
+    const username = form.username.trim();
+    const email = form.email.trim().toLowerCase();
     if (form.password !== form.confirm) {
       setError("Password hazifanani.");
       return;
     }
+    if (name.length < 2) { setError("Weka jina lako kamili."); return; }
+    if (username.length < 3) { setError("Username iwe na angalau herufi 3."); return; }
+    if (form.password.length < 6) { setError("Password iwe na angalau herufi 6."); return; }
     setLoading(true);
     try {
-      const result = await registerDreamVoraAccount({ data: { name: form.name, username: form.username, phone: form.phone, email: form.email, country: form.country, password: form.password } });
+      const result = await registerDreamVoraAccount({ data: { name, username, phone: form.phone, email, country: form.country, password: form.password } });
       saveSession(result.token);
       saveServerAccount(result.account);
       navigate({ to: "/payment" });

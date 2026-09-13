@@ -42,7 +42,8 @@ async function ensureSchema(sql: ReturnType<typeof postgres>) {
       submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       approved_at TIMESTAMPTZ,
       rejected_at TIMESTAMPTZ,
-      transid TEXT
+      transid TEXT,
+      confirmed_at TIMESTAMPTZ
     )
   `;
   await sql`ALTER TABLE dreamvora_payments ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'TZS'`;
@@ -51,6 +52,7 @@ async function ensureSchema(sql: ReturnType<typeof postgres>) {
   await sql`ALTER TABLE dreamvora_payments ADD COLUMN IF NOT EXISTS reference TEXT`;
   await sql`ALTER TABLE dreamvora_payments ADD COLUMN IF NOT EXISTS channel TEXT`;
   await sql`ALTER TABLE dreamvora_payments ADD COLUMN IF NOT EXISTS provider_status TEXT`;
+  await sql`ALTER TABLE dreamvora_payments ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ`;
   await sql`CREATE INDEX IF NOT EXISTS dreamvora_payments_status_idx ON dreamvora_payments(status)`;
   await sql`CREATE INDEX IF NOT EXISTS dreamvora_payments_user_idx ON dreamvora_payments(user_id, submitted_at DESC)`;
   await sql`CREATE INDEX IF NOT EXISTS dreamvora_payments_provider_order_idx ON dreamvora_payments(provider_order_id)`;
@@ -118,10 +120,22 @@ export const registerDreamVoraAccount = createServerFn({ method: "POST" })
     const sql = db();
     try {
       await ensureSchema(sql);
-      const existing = await sql`SELECT id FROM dreamvora_users WHERE LOWER(username) = LOWER(${username}) OR LOWER(email) = LOWER(${email}) LIMIT 1`;
-      if (existing[0]) throw new Error("Username au email tayari imetumika.");
+      const existing = await sql`SELECT id, username, email FROM dreamvora_users WHERE LOWER(username) = LOWER(${username}) OR LOWER(email) = LOWER(${email}) LIMIT 1`;
+      if (existing[0]) {
+        const sameUsername = String(existing[0].username ?? "").toLowerCase() === username.toLowerCase();
+        const sameEmail = String(existing[0].email ?? "").toLowerCase() === email.toLowerCase();
+        if (sameUsername && sameEmail) throw new Error("Username na email tayari zimetumika.");
+        if (sameUsername) throw new Error("Username tayari imetumika. Chagua username nyingine.");
+        throw new Error("Email tayari imetumika. Tumia email nyingine.");
+      }
       const id = randomUUID();
-      await sql`INSERT INTO dreamvora_users (id, name, username, phone, email, country, password_hash) VALUES (${id}, ${data.name.trim()}, ${username}, ${phone}, ${email}, ${data.country}, ${hashPassword(data.password)})`;
+      try {
+        await sql`INSERT INTO dreamvora_users (id, name, username, phone, email, country, password_hash) VALUES (${id}, ${data.name.trim()}, ${username}, ${phone}, ${email}, ${data.country}, ${hashPassword(data.password)})`;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (/unique|duplicate/i.test(message)) throw new Error("Username au email tayari imetumika.");
+        throw new Error(`Usajili umeshindikana kuhifadhi taarifa kwenye database: ${message}`);
+      }
       return { token: tokenFor(id, "user"), account: { id, name: data.name.trim(), username, phone, email, country: data.country, paid: false, balance: 0 } };
     } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
   });
