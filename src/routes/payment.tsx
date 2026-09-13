@@ -1,104 +1,184 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { PAYMENT_AMOUNT, startZonmPayPayment } from "@/lib/zonmpay.functions";
-import { checkDreamVoraPayment, confirmDreamVoraPayment, createDreamVoraPayment } from "@/lib/dreamvora.server";
-import { clearPendingChat, getAccount, getPendingChat, getSession, markPaid, saveSession } from "@/lib/local-storage";
+import { useEffect, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { checkPaymentStatus, startPayment, PAYMENT_AMOUNT } from "@/lib/kozena.functions";
+import { clearPendingChat, getAccount, getPendingChat, markPaid, saveAccount } from "@/lib/local-storage";
 
 export const Route = createFileRoute("/payment")({
-  head: () => ({ meta: [{ title: "Lipa — DreamVora" }, { name: "description", content: "Lipia DreamVora kwa USSD Push." }, { name: "robots", content: "noindex, nofollow" }] }),
+  head: () => ({
+    meta: [
+      { title: "Lipa — DreamVora" },
+      {
+        name: "description",
+        content:
+          "Kamilisha malipo ya DreamVora kwa USSD Push. Weka namba yako ya simu na thibitisha malipo kwenye simu.",
+      },
+      { property: "og:title", content: "Lipa — DreamVora" },
+      { property: "og:description", content: "Lipia DreamVora kwa USSD Push moja kwa moja kwenye simu yako." },
+      { name: "robots", content: "noindex, nofollow" },
+    ],
+  }),
   component: PaymentPage,
 });
 
-const CHANNELS = [
-  { value: "MPESA", label: "Vodacom M-Pesa" },
-  { value: "TIGOPESA", label: "Mixx by Yas" },
-  { value: "AIRTELMONEY", label: "Airtel Money" },
-  { value: "HALOPESA", label: "HaloPesa" },
-];
-
-type Status = "idle" | "sending" | "awaiting_confirmation" | "pending" | "approved" | "rejected";
+type Phase = "form" | "waiting" | "failed";
 
 function PaymentPage() {
   const navigate = useNavigate();
+  const createOrder = useServerFn(startPayment);
+  const pollStatus = useServerFn(checkPaymentStatus);
   const [ready, setReady] = useState(false);
   const [phone, setPhone] = useState("");
-  const [channel, setChannel] = useState("MPESA");
-  const [status, setStatus] = useState<Status>("idle");
-  const [paymentId, setPaymentId] = useState<string | null>(null);
+  const [phase, setPhase] = useState<Phase>("form");
   const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     const account = getAccount();
-    if (!account) { navigate({ to: "/register" }); return; }
-    if (account.paid) { goAfterPayment(navigate); return; }
+    if (!account) {
+      navigate({ to: "/register" });
+      return;
+    }
+    if (account.paid) {
+      const pendingChat = getPendingChat();
+      if (pendingChat) {
+        clearPendingChat();
+        navigate({ to: "/chat/$name", params: { name: pendingChat } });
+      } else {
+        navigate({ to: "/dashboard" });
+      }
+      return;
+    }
+    setPhone(account.phone);
     setReady(true);
+    return () => {
+      if (timer.current) clearInterval(timer.current);
+    };
   }, [navigate]);
 
-  useEffect(() => {
-    if (status !== "pending" && status !== "awaiting_confirmation") return;
-    const token = getSession();
-    if (!token) return;
-    const timer = window.setInterval(() => {
-      void checkDreamVoraPayment({ data: { token } }).then((r) => {
-        if (r.paymentId) setPaymentId(String(r.paymentId));
-        if (r.status === "APPROVED") { markPaid(); setStatus("approved"); goAfterPayment(navigate); }
-        else if (r.status === "PENDING_ADMIN") { setStatus("pending"); setMessage("NIMELIPIA imepokelewa. Admin anaangalia malipo yako."); }
-        else if (r.status === "FAILED" || r.status === "REJECTED") { setStatus("rejected"); setMessage("Malipo hayajakamilika. Jaribu tena."); }
-      }).catch(() => undefined);
-    }, 4000);
-    return () => window.clearInterval(timer);
-  }, [status, navigate]);
-
-  async function payNow(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
+    setPhase("waiting");
     const account = getAccount();
-    if (!account) { navigate({ to: "/register" }); return; }
-    setStatus("sending"); setMessage(null);
+    if (!account) {
+      navigate({ to: "/register" });
+      return;
+    }
     try {
-      const push = await startZonmPayPayment({ data: { phone, buyerName: account.name, buyerEmail: account.email, channel } });
-      const record = await createDreamVoraPayment({ data: { account: { id: account.id, name: account.name, username: account.username, phone: account.phone, email: account.email, country: account.country }, phoneUsed: phone, providerOrderId: push.orderId, reference: push.reference, channel, providerStatus: push.status } });
-      if (record.token) saveSession(record.token);
-      setPaymentId(record.paymentId ? String(record.paymentId) : null);
-      if (record.status === "APPROVED") { markPaid(); setStatus("approved"); goAfterPayment(navigate); return; }
-      setStatus("awaiting_confirmation");
-      setMessage("USSD Push imetumwa kwenye simu yako. Ingiza PIN yako, kisha bonyeza NIMELIPIA.");
-    } catch (err) { setStatus("rejected"); setMessage(err instanceof Error ? err.message : "Imeshindikana kuanzisha malipo."); }
+      const order = await createOrder({
+        data: {
+          phone,
+          buyerName: account.name,
+          buyerEmail: account.email,
+        },
+      });
+      saveAccount({ ...account, phone });
+      setMessage(order.message);
+      let attempts = 0;
+      timer.current = setInterval(async () => {
+        attempts += 1;
+        try {
+          const res = await pollStatus({ data: { orderId: order.order_id } });
+          if (res.payment_status === "COMPLETED") {
+            if (timer.current) clearInterval(timer.current);
+            markPaid();
+            const pendingChat = getPendingChat();
+            if (pendingChat) {
+              clearPendingChat();
+              navigate({ to: "/chat/$name", params: { name: pendingChat } });
+            } else {
+              navigate({ to: "/dashboard" });
+            }
+            return;
+          }
+          if (["CANCELLED", "USERCANCELLED", "REJECTED"].includes(res.payment_status)) {
+            if (timer.current) clearInterval(timer.current);
+            setPhase("failed");
+            setError("Malipo hayakukamilika. Tafadhali jaribu tena.");
+          }
+        } catch {
+          /* keep polling */
+        }
+        if (attempts >= 40) {
+          if (timer.current) clearInterval(timer.current);
+          setPhase("failed");
+          setError("Muda umeisha bila kupokea uthibitisho wa malipo. Jaribu tena.");
+        }
+      }, 4000);
+    } catch (err) {
+      setPhase("failed");
+      setError(err instanceof Error ? err.message : "Imeshindikana kuanzisha malipo.");
+    }
   }
 
-  async function confirmPaid() {
-    const token = getSession();
-    if (!token || !paymentId) { setMessage("Anza LIPA SASA kwanza."); return; }
-    setStatus("pending"); setMessage(null);
-    try { const r = await confirmDreamVoraPayment({ data: { token, paymentId, phoneUsed: phone } }); if (r.status === "APPROVED") { markPaid(); setStatus("approved"); goAfterPayment(navigate); } else { setMessage("Tumepokea NIMELIPIA. Admin atathibitisha malipo kabla ya account kufunguka."); } }
-    catch (err) { setStatus("awaiting_confirmation"); setMessage(err instanceof Error ? err.message : "Imeshindikana kutuma uthibitisho."); }
+  if (!ready) {
+    return <main className="flex min-h-screen items-center justify-center bg-k-slate-50 font-jost text-k-slate-500">Inapakia...</main>;
   }
 
-  if (!ready) return <main className="flex min-h-screen items-center justify-center bg-k-slate-50 font-jost text-k-slate-500">Inapakia...</main>;
+  return (
+    <div className="min-h-screen bg-k-slate-50 font-jost text-k-slate-800">
+      <header className="flex items-center justify-between bg-k-green-900 px-6 py-4">
+        <span className="text-lg font-extrabold tracking-tight text-white">
+          DREAMVORA <span className="text-k-amber-400">SITE</span>
+        </span>
+        <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] tracking-wide text-k-green-100">MALIPO SALAMA</span>
+      </header>
 
-  return <div className="payment-page min-h-screen bg-k-slate-50 font-jost text-k-slate-800">
-    <header className="payment-header-bar"><span className="payment-brand">DREAMVORA <span>SITE</span></span><span className="payment-secure-pill">MALIPO SALAMA</span></header>
-    <main className="payment-main">
-      <div className="payment-security"><div className="payment-security-icon">🛡</div><div><h2>LINDA PESA YAKO</h2><p>USSD Push inatumwa moja kwa moja kwenye simu yako. DreamVora haiombi PIN yako.</p></div></div>
-      <div className="payment-country-pill">🇹🇿 Tanzania • USSD Push</div>
-      <section className="payment-summary-card">
-        <div className="payment-summary-head"><div className="payment-summary-icon">⚡</div><div><h3>DreamVora</h3><p>USSD Push Payment</p></div></div>
-        <div className="payment-amount-row"><span>Kiasi cha kulipa</span><strong>{PAYMENT_AMOUNT.toLocaleString()} TZS</strong></div>
-        <form onSubmit={payNow} className="payment-push-form">
-          <label>Namba ya simu ya kulipia</label>
-          <input value={phone} onChange={(e)=>setPhone(e.target.value.replace(/[^0-9+]/g,""))} inputMode="tel" placeholder="06XXXXXXXX" required disabled={status === "sending" || status === "pending"} />
-          <label>Chagua mtandao</label>
-          <select value={channel} onChange={(e)=>setChannel(e.target.value)} disabled={status === "sending" || status === "pending"}>{CHANNELS.map(c=><option key={c.value} value={c.value}>{c.label}</option>)}</select>
-          {status === "awaiting_confirmation" || status === "pending" ? <button type="button" className="payment-pay-button" onClick={()=>void confirmPaid()} disabled={status === "pending"}>{status === "pending" ? "INASUBIRI ADMIN..." : "✓ NIMELIPIA"}</button> : <button type="submit" className="payment-pay-button" disabled={status === "sending"}>{status === "sending" ? "INATUMA PUSH..." : "🔒 LIPA SASA"}</button>}
-        </form>
-        {status === "sending" && <div className="payment-status-box payment-status-pending"><strong>Inaandaa USSD Push...</strong><span>Tafadhali subiri.</span></div>}
-        {status === "awaiting_confirmation" && <div className="payment-status-box payment-status-pending"><strong>USSD PUSH IMETUMWA</strong><span>Ingiza PIN kwenye simu yako kukamilisha TZS {PAYMENT_AMOUNT.toLocaleString()}, kisha bonyeza <b>NIMELIPIA</b>.</span></div>}
-        {status === "pending" && <div className="payment-status-box payment-status-pending"><strong>INASUBIRI UTHIBITISHO WA ADMIN</strong><span>{message}</span></div>}
-        {status === "approved" && <div className="payment-status-box payment-status-success"><strong>MALIPO YAMEFANIKIWA ✓</strong><span>Akaunti yako imefunguka.</span></div>}
-        {status === "rejected" && <div className="payment-status-box payment-status-error"><strong>MALIPO HAYAKUKAMILIKA</strong><span>{message || "Jaribu tena."}</span></div>}
-      </section>
-      <section className="payment-info-card"><h2>Jinsi malipo yanavyofanya kazi</h2><div className="push-steps"><div><b>1</b><span>Weka namba ya simu utakayotumia kulipia.</span></div><div><b>2</b><span>Chagua mtandao kisha bonyeza LIPA SASA.</span></div><div><b>3</b><span>USSD Push itatumwa kwenye simu. Ingiza PIN yako.</span></div><div><b>4</b><span>Baada ya kulipa, bonyeza NIMELIPIA. Admin atathibitisha malipo na kufungua account.</span></div></div><p className="payment-security-note">🔐 PIN inaingizwa kwenye simu yako pekee.</p></section>
-    </main>
-  </div>;
+      <main className="mx-auto max-w-xl px-4 pb-16 pt-7">
+        <div className="mb-6 flex gap-3 rounded-2xl border-[1.5px] border-k-red-300 bg-k-red-50 p-4">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-k-red-100 text-k-red-600">🛡</div>
+          <div>
+            <h2 className="text-xs font-bold tracking-widest text-k-red-600">LINDA PESA YAKO</h2>
+            <p className="mt-1 text-sm leading-relaxed text-k-red-900">
+              Lipia kupitia mfumo huu pekee.
+              Malipo nje ya mfumo huu ni batili na hayatakubaliwa.
+            </p>
+          </div>
+        </div>
+
+        <div className="mb-5 flex gap-2">
+          <span className="flex items-center gap-2 rounded-full border-[1.5px] border-k-green-800 bg-k-green-800 px-4 py-2 text-[13px] text-white">🇹🇿 Tanzania</span>
+        </div>
+
+        <section className="mb-5 overflow-hidden rounded-3xl border-[1.5px] border-k-slate-200 bg-white">
+          <div className="flex items-center gap-3 border-b border-k-slate-100 px-5 py-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-k-green-50 text-k-green-700">⚡</div>
+            <div>
+              <h3 className="font-semibold">Tanzania</h3>
+              <p className="text-xs text-k-slate-500">Lipia moja kwa moja kwa USSD Push</p>
+            </div>
+          </div>
+          <div className="px-5 py-5">
+            <div className="mb-4 flex items-center justify-between rounded-2xl bg-k-green-50 px-4 py-3">
+              <span className="text-sm text-k-green-700">Kiasi cha kulipa</span>
+              <span className="text-lg font-bold text-k-green-900">{PAYMENT_AMOUNT.toLocaleString()} TZS</span>
+            </div>
+
+            {error && <div className="mb-4 rounded-xl border border-k-red-300 bg-k-red-50 px-4 py-3 text-sm text-k-red-900">{error}</div>}
+
+            {phase === "waiting" ? (
+              <div className="rounded-2xl border-[1.5px] border-k-slate-200 p-6 text-center">
+                <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-k-green-100 border-t-k-green-700" />
+                <p className="font-semibold text-k-green-900">Subiri uthibitisho...</p>
+                <p className="mt-1 text-sm text-k-slate-500">
+                  {message ?? "Push USSD imetumwa kwenye simu yako."} Ingiza namba yako ya siri kuthibitisha malipo.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={onSubmit}>
+                <label className="mb-1 block text-xs font-bold text-k-slate-500" htmlFor="tz-phone">Namba ya simu</label>
+                <div className="mb-4 flex items-center overflow-hidden rounded-xl border-[1.5px] border-k-slate-200 bg-k-slate-50">
+                  <span className="border-r border-k-slate-200 px-3 py-3 text-sm text-k-slate-500">🇹🇿 +255</span>
+                  <input id="tz-phone" type="tel" required maxLength={12} placeholder="06XXXXXXXX" value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))} className="w-full bg-transparent px-3 py-3 text-sm outline-none" />
+                </div>
+                <button type="submit" className="k-btn-green hover:opacity-90">🔒 LIPA SASA</button>
+              </form>
+            )}
+          </div>
+        </section>
+      </main>
+    </div>
+  );
 }
-
-function goAfterPayment(navigate: ReturnType<typeof useNavigate>) { const pendingChat=getPendingChat(); if(pendingChat){clearPendingChat();navigate({to:"/chat/$name",params:{name:pendingChat}});}else navigate({to:"/dashboard"}); }

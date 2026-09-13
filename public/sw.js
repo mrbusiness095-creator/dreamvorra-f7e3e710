@@ -1,4 +1,4 @@
-const CACHE = "dreamvora-v3";
+const CACHE = "dreamvora-v2";
 self.addEventListener("install", (e) => {
   self.skipWaiting();
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/", "/favicon.png"])).catch(() => {}));

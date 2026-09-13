@@ -1,11 +1,10 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { BackButton, Flag, Header, Modal } from "@/components/dv";
 import { findUser, firstMessageBroken } from "@/data/users";
 import { addEarnings, getAccount, setPendingChat, withdrawBalance, type DreamVoraAccount } from "@/lib/local-storage";
 
 export const Route = createFileRoute("/chat/$name")({
-  errorComponent: ({ error }) => <div className="flex min-h-screen items-center justify-center bg-background px-6 text-center"><div className="max-w-sm"><p className="text-lg font-bold text-foreground">Chat haikuweza kufunguka</p><p className="mt-2 text-sm text-muted-foreground">Jaribu tena au rudi kwenye ukurasa wa mwanzo.</p><button onClick={() => window.location.reload()} className="mt-4 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">Jaribu tena</button></div></div>,
   head: ({ params }) => ({
     meta: [
       { title: `Chat na ${params.name} | DreamVora Tanzania` },
@@ -30,10 +29,10 @@ function normalizePhone(value: string) {
 }
 
 function ChatPage() {
-  const { name } = Route.useParams();
+  const { name } = useParams({ from: "/chat/$name" });
   const navigate = useNavigate();
-  const user = findUser(decodeURIComponent(name));
-  const storageKey = `dreamvora_chat_${decodeURIComponent(name).toLowerCase()}`;
+  const user = findUser(name);
+  const storageKey = `dreamvora_chat_${name.toLowerCase()}`;
   const [account, setAccount] = useState<DreamVoraAccount | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
@@ -47,21 +46,14 @@ function ChatPage() {
   const myMessageCount = useMemo(() => messages.filter((m) => m.from === "me").length, [messages]);
 
   useEffect(() => {
-    // Chat must always be able to open even when the account/database is unavailable.
-    // Authentication/payment checks happen only when the user tries to send a message.
-    const localAccount = getAccount();
-    setAccount(localAccount);
-    if (localAccount?.phone) setWithdrawPhone(localAccount.phone);
+    const saved = getAccount();
+    setAccount(saved);
+    setWithdrawPhone(saved?.phone ?? "");
     try {
       const raw = sessionStorage.getItem(storageKey);
-      if (raw) {
-        setMessages(JSON.parse(raw) as Message[]);
-        return;
-      }
+      if (raw) { setMessages(JSON.parse(raw) as Message[]); return; }
     } catch { /* fresh state */ }
-    if (user) {
-      setMessages([{ id: "foreigner-1", from: "foreigner", text: firstMessageBroken(user.name, user.wants), time: nowTime() }]);
-    }
+    if (user) setMessages([{ id: "foreigner-1", from: "foreigner", text: firstMessageBroken(user.name, user.wants), time: nowTime() }]);
   }, [storageKey, user]);
 
   useEffect(() => { if (messages.length) sessionStorage.setItem(storageKey, JSON.stringify(messages)); }, [messages, storageKey]);
@@ -92,10 +84,7 @@ function ChatPage() {
     if (!result.ok) { setWithdrawError(result.error); return; }
     setAccount(result.account); setAmount(""); setWithdrawNotice("Withdrawal imefanikiwa.");
   }
-  const goRegister = () => {
-    setPendingChat(user.name);
-    navigate({ to: "/register" });
-  };
+  const goRegister = () => { setPendingChat(user.name); navigate({ to: "/register" }); };
 
   return <div className="flex min-h-screen flex-col bg-background">
     <Header currentBalance={account?.paid ? account.balance : null} onWithdraw={() => setWithdraw(true)} onBalance={() => setWithdraw(true)} />

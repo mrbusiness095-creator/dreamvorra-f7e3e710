@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import logo from "@/assets/dreamvora-logo.png.asset.json";
 import { clearPendingChat, createAccount, getAccount, getPendingChat } from "@/lib/local-storage";
-import { syncDreamVoraAccount } from "@/lib/dreamvora.server";
 
 export const Route = createFileRoute("/register")({
   head: () => ({
@@ -79,33 +78,16 @@ function RegisterPage() {
       setLoading(false);
       return;
     }
-    const account = createAccount({
-      name: form.name.trim(),
-      username: form.username.trim(),
-      phone: form.phone.trim(),
-      email: form.email.trim().toLowerCase(),
+    createAccount({
+      name: form.name,
+      username: form.username,
+      phone: form.phone,
+      email: form.email,
       country: form.country,
       password: form.password,
     });
-
-    try {
-      const result = await syncDreamVoraAccount({
-        data: {
-          id: account.id,
-          name: account.name,
-          username: account.username,
-          phone: account.phone,
-          email: account.email,
-          country: account.country,
-        },
-      });
-      localStorage.setItem("dreamvora_server_token", result.token);
-      setLoading(false);
-      navigate({ to: "/payment" });
-    } catch (err) {
-      setLoading(false);
-      setError(err instanceof Error ? err.message : "Usajili haujakamilika. Tafadhali jaribu tena.");
-    }
+    setLoading(false);
+    navigate({ to: "/payment" });
   }
 
   return (

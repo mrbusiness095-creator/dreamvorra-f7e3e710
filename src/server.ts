@@ -2,7 +2,6 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
-import { applyZonmPayWebhook } from "./lib/dreamvora.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -59,15 +58,6 @@ export default {
             Location: url.toString(),
             "Cache-Control": "public, max-age=86400",
           },
-        });
-      }
-
-      if (url.pathname === "/api/zonmpay/webhook" && request.method === "POST") {
-        const payload = await request.json().catch(() => null);
-        const result = await applyZonmPayWebhook(payload);
-        return new Response(JSON.stringify({ ok: result.ok, message: result.message }), {
-          status: result.status,
-          headers: { "content-type": "application/json; charset=utf-8" },
         });
       }
 

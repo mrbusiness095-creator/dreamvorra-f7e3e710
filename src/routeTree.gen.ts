@@ -15,8 +15,6 @@ import { Route as ChatNameRouteImport } from './routes/chat.$name'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as PaymentRouteImport } from './routes/payment'
-import { Route as AdminRouteImport } from './routes/admin'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -43,17 +41,6 @@ const RegisterRoute = RegisterRouteImport.update({
   path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PaymentRoute = PaymentRouteImport.update({
-  id: '/payment',
-  path: '/payment',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminRoute = AdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => rootRouteImport,
-} as any)
-
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -67,8 +54,6 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/dashboard': typeof DashboardRoute
-  '/payment': typeof PaymentRoute
-  '/admin': typeof AdminRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -77,8 +62,6 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/dashboard': typeof DashboardRoute
-  '/payment': typeof PaymentRoute
-  '/admin': typeof AdminRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -88,15 +71,13 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/dashboard': typeof DashboardRoute
-  '/payment': typeof PaymentRoute
-  '/admin': typeof AdminRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/sitemap.xml' | '/chat/$name' | '/login' | '/register' | '/dashboard' | '/payment' | '/admin'
+  fullPaths: '/' | '/sitemap.xml' | '/chat/$name' | '/login' | '/register' | '/dashboard'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/sitemap.xml' | '/chat/$name' | '/login' | '/register' | '/dashboard' | '/payment' | '/admin'
-  id: '__root__' | '/' | '/sitemap.xml' | '/chat/$name' | '/login' | '/register' | '/dashboard' | '/payment' | '/admin'
+  to: '/' | '/sitemap.xml' | '/chat/$name' | '/login' | '/register' | '/dashboard'
+  id: '__root__' | '/' | '/sitemap.xml' | '/chat/$name' | '/login' | '/register' | '/dashboard'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -105,9 +86,6 @@ export interface RootRouteChildren {
   ChatNameRoute: typeof ChatNameRoute
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
-  DashboardRoute: typeof DashboardRoute
-  PaymentRoute: typeof PaymentRoute
-  AdminRoute: typeof AdminRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -154,20 +132,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/payment': {
-      id: '/payment'
-      path: '/payment'
-      fullPath: '/payment'
-      preLoaderRoute: typeof PaymentRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin': {
-      id: '/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -178,8 +142,6 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
   DashboardRoute: DashboardRoute,
-  PaymentRoute: PaymentRoute,
-  AdminRoute: AdminRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
