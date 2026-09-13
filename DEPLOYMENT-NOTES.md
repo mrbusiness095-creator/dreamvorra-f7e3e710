@@ -23,3 +23,7 @@ DreamVora uses TanStack Start SSR, so requests must reach the server function.
 - Do not remove `@netlify/vite-plugin-tanstack-start` from `package.json`.
 - Do not replace the TanStack Start routes with a static `index.html` fallback.
 - Vercel should be allowed to auto-detect the TanStack Start/Nitro deployment.
+
+
+## ZonmPay live payments
+Set `ZONMPAY_API_KEY` in Netlify Environment Variables. Do not put the key in frontend code, GitHub, or this ZIP. Register `https://dreamvorra.site/api/zonmpay/webhook` in ZonmPay Developer Settings so successful payment events can automatically activate accounts.

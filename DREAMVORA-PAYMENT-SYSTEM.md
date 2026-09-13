@@ -1,23 +1,28 @@
-# DreamVora — Lipa Namba manual verification system
+# DreamVora — ZonmPay USSD Push + Manual Admin Approval
 
 ## Flow
-1. User registers. Registration is stored in Netlify Database; password is stored as a salted scrypt hash, not plain text.
-2. User sees the existing Lipa Namba instructions for `354136248` and `14,500 TZS`.
-3. User enters the phone number used to pay and clicks **NIMELIPIA**.
-4. A `PENDING` payment request is stored in the database.
-5. Admin opens `/admin`, signs in, and sees new requests. The list refreshes every 5 seconds.
-6. Admin verifies the real mobile-money transaction outside the website and clicks **APPROVE** or **REJECT**.
-7. Approval changes the user's server-side `paid` flag to `TRUE`.
-8. The payment page polls the server. After approval it automatically redirects to the pending Chat, or Dashboard if there is no pending Chat.
+1. User registers.
+2. User opens Payment and enters the phone number/network used for payment.
+3. DreamVora starts a ZonmPay USSD Push for TZS 14,500.
+4. User enters the mobile-money PIN on their phone.
+5. User presses **NIMELIPIA** and submits the phone number used for payment.
+6. Admin sees the request at `/admin` and can **APPROVE** or **REJECT** it.
+7. Only an Admin approval sets `dreamvora_users.paid = TRUE` and unlocks the account.
+8. The user page polls the status. After approval, the user is redirected to the pending chat (if one exists) or Dashboard.
 
-## Required Netlify environment variables
-- `NETLIFY_DB_URL` — provided by Netlify Database after provisioning the database.
-- `DREAMVORA_AUTH_SECRET` — random secret, minimum 32 characters.
-- `DREAMVORA_ADMIN_PASSWORD` — private admin password.
+## Netlify Environment Variables
+- `NETLIFY_DB_URL` — provided by Netlify Database at runtime.
+- `DREAMVORA_AUTH_SECRET` — random secret, 32+ characters.
+- `DREAMVORA_ADMIN_PASSWORD` — your private admin password.
+- `ZONMPAY_API_KEY` — secret API key from ZonmPay Developer Settings.
+- `ZONMPAY_BASE_URL` — normally `https://zonmpay.com/api`.
+- `ZONMPAY_WEBHOOK_URL` — `https://dreamvorra.site/api/zonmpay/webhook`.
 
-## Netlify setup
-Provision a database in Netlify under **Data & Storage → Database**, then add the three environment variables above under the site's environment variables. Deploy again. The application creates its two tables automatically on first server request.
+## ZonmPay Developer Settings
+Register the website domain:
+`https://dreamvorra.site`
 
-Admin page: `/admin`
+Set the webhook URL to:
+`https://dreamvorra.site/api/zonmpay/webhook`
 
-Important: this version intentionally does **not** mark a payment as paid just because the customer clicks **NIMELIPIA**. Only the admin approval changes the server-side paid state.
+The webhook records ZonmPay's provider status but does **not** unlock the account. Admin approval remains the final gate.

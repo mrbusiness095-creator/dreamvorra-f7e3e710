@@ -36,3 +36,7 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+## DreamVora payments
+
+DreamVora now uses ZonmPay USSD Push for the TZS 14,500 activation payment. Set `ZONMPAY_API_KEY` in Netlify Environment Variables and register `https://dreamvorra.site/api/zonmpay/webhook` in ZonmPay Developer Settings. Successful webhook confirmation activates the user's account automatically; no manual payment approval is required.

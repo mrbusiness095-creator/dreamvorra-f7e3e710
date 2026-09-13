@@ -20,6 +20,7 @@ export function clearSession() { localStorage.removeItem(TOKEN_KEY); }
 export function saveServerAccount(account: Omit<DreamVoraAccount, "withdrawals">) { saveAccount({ ...account, withdrawals: getAccount()?.withdrawals ?? [] }); }
 export function isRegistered() { return !!getAccount() && !!getSession(); }
 export function markPaid() { const account = getAccount(); if (!account) return null; const updated = { ...account, paid: true }; saveAccount(updated); return updated; }
+export function addEarnings(amount: number) { const account = getAccount(); if (!account || !Number.isFinite(amount) || amount <= 0) return null; const updated = { ...account, balance: Math.max(0, account.balance + amount) }; saveAccount(updated); return updated; }
 export function withdrawBalance(amount: number, phone: string) {
   const account = getAccount(); if (!account) return { ok: false as const, error: "Akaunti haijapatikana." };
   if (!account.paid) return { ok: false as const, error: "Kamilisha malipo kwanza." };
