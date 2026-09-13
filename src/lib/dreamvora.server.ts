@@ -1,12 +1,52 @@
 import { createServerFn } from "@tanstack/react-start";
 import postgres from "postgres";
-import { createHmac, randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { PAYMENT_AMOUNT } from "./zonmpay.functions";
 
-const AUTH_SECRET = process.env.DREAMVORA_AUTH_SECRET;
+function env(name: string): string | undefined {
+  if (typeof process !== "undefined" && process.env) return process.env[name];
+  return undefined;
+}
+
+function randomId() {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+}
+
+function bytesToBase64Url(bytes: Uint8Array) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function base64UrlToBytes(value: string) {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((value.length + 3) % 4);
+  const binary = atob(base64);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+function textToBase64Url(value: string) {
+  return bytesToBase64Url(new TextEncoder().encode(value));
+}
+
+function base64UrlToText(value: string) {
+  return new TextDecoder().decode(base64UrlToBytes(value));
+}
+
+async function hmacBase64Url(value: string) {
+  const secret = env("DREAMVORA_AUTH_SECRET");
+  if (!secret || secret.length < 32) throw new Error("DREAMVORA_AUTH_SECRET lazima iwe na angalau herufi 32.");
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return bytesToBase64Url(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value))));
+}
+
+function safeEqual(a: string, b: string) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
 
 function db() {
-  const url = process.env.NETLIFY_DB_URL;
+  const url = env("NETLIFY_DB_URL");
   if (!url) throw new Error("NETLIFY_DB_URL haijawekwa. Provision Netlify Database kwanza.");
   return postgres(url, { max: 1, prepare: false });
 }
@@ -59,29 +99,27 @@ async function ensureSchema(sql: ReturnType<typeof postgres>) {
   await sql`CREATE INDEX IF NOT EXISTS dreamvora_payments_reference_idx ON dreamvora_payments(reference)`;
 }
 
-function requireSecret() {
-  if (!AUTH_SECRET || AUTH_SECRET.length < 32) throw new Error("DREAMVORA_AUTH_SECRET lazima iwe na angalau herufi 32.");
-  return AUTH_SECRET;
+async function hashPassword(password: string) {
+  const salt = new Uint8Array(16);
+  crypto.getRandomValues(salt);
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: 120000, hash: "SHA-256" }, key, 256));
+  return `${bytesToBase64Url(salt)}:${bytesToBase64Url(bits)}`;
 }
 
-function hashPassword(password: string) {
-  const salt = randomBytes(16).toString("hex");
-  return `${salt}:${scryptSync(password, salt, 64).toString("hex")}`;
-}
-
-function tokenFor(subject: string, kind: "user" | "admin") {
+async function tokenFor(subject: string, kind: "user" | "admin") {
   const payload = `${kind}:${subject}:${Date.now() + 7 * 24 * 60 * 60 * 1000}`;
-  const body = Buffer.from(payload).toString("base64url");
-  const sig = createHmac("sha256", requireSecret()).update(body).digest("base64url");
+  const body = textToBase64Url(payload);
+  const sig = await hmacBase64Url(body);
   return `${body}.${sig}`;
 }
 
-function verifyToken(token: string, kind: "user" | "admin") {
+async function verifyToken(token: string, kind: "user" | "admin") {
   const [body, signature] = token.split(".");
   if (!body || !signature) throw new Error("Session haipo sahihi.");
-  const expected = createHmac("sha256", requireSecret()).update(body).digest("base64url");
-  if (signature.length !== expected.length || !timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) throw new Error("Session si sahihi.");
-  const [tokenKind, subject, expiry] = Buffer.from(body, "base64url").toString("utf8").split(":");
+  const expected = await hmacBase64Url(body);
+  if (!safeEqual(signature, expected)) throw new Error("Session si sahihi.");
+  const [tokenKind, subject, expiry] = base64UrlToText(body).split(":");
   if (tokenKind !== kind || !subject || Number(expiry) < Date.now()) throw new Error("Session imekwisha.");
   return subject;
 }
@@ -103,13 +141,13 @@ async function ensureLocalUser(sql: ReturnType<typeof postgres>, data: { id: str
   } else {
     const byUnique = await sql`SELECT id FROM dreamvora_users WHERE LOWER(username)=LOWER(${data.username.trim()}) OR LOWER(email)=LOWER(${email}) LIMIT 1`;
     if (byUnique[0] && String(byUnique[0].id) !== data.id) throw new Error("Username au email tayari imetumika.");
-    await sql`INSERT INTO dreamvora_users (id,name,username,phone,email,country,password_hash) VALUES (${data.id},${data.name.trim()},${data.username.trim()},${phone},${email},${data.country},${hashPassword(randomUUID())})`;
+    await sql`INSERT INTO dreamvora_users (id,name,username,phone,email,country,password_hash) VALUES (${data.id},${data.name.trim()},${data.username.trim()},${phone},${email},${data.country},${await hashPassword(randomId())})`;
   }
   return data.id;
 }
 
 async function getUserByToken(sql: ReturnType<typeof postgres>, token: string) {
-  const userId = verifyToken(token, "user");
+  const userId = await verifyToken(token, "user");
   const rows = await sql`SELECT id,name,username,phone,email,country,paid,balance FROM dreamvora_users WHERE id=${userId} LIMIT 1`;
   if (!rows[0]) throw new Error("Akaunti haijapatikana.");
   return rows[0];
@@ -120,7 +158,7 @@ export const syncDreamVoraAccount = createServerFn({ method: "POST" })
   .inputValidator((input: { id: string; name: string; username: string; phone: string; email: string; country: string }) => input)
   .handler(async ({ data }) => {
     const sql = db();
-    try { await ensureSchema(sql); const id = await ensureLocalUser(sql, data); return { token: tokenFor(id, "user") }; }
+    try { await ensureSchema(sql); const id = await ensureLocalUser(sql, data); return { token: await tokenFor(id, "user") }; }
     finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
   });
 
@@ -132,13 +170,13 @@ export const createDreamVoraPayment = createServerFn({ method: "POST" })
       await ensureSchema(sql);
       const userId = await ensureLocalUser(sql, data.account);
       const userRows = await sql`SELECT paid FROM dreamvora_users WHERE id=${userId} LIMIT 1`;
-      if (Boolean(userRows[0]?.paid)) return { status: "APPROVED", paymentId: null, token: tokenFor(userId,"user"), message: "Akaunti yako tayari imefunguka." };
+      if (Boolean(userRows[0]?.paid)) return { status: "APPROVED", paymentId: null, token: await tokenFor(userId,"user"), message: "Akaunti yako tayari imefunguka." };
       const phoneUsed = cleanPhone(data.phoneUsed);
       const existing = await sql`SELECT id,status FROM dreamvora_payments WHERE provider_order_id=${data.providerOrderId} OR reference=${data.reference} ORDER BY submitted_at DESC LIMIT 1`;
-      if (existing[0]) return { status: String(existing[0].status), paymentId: String(existing[0].id), token: tokenFor(userId,"user"), message: "Ombi la malipo limesajiliwa." };
-      const paymentId = randomUUID();
+      if (existing[0]) return { status: String(existing[0].status), paymentId: String(existing[0].id), token: await tokenFor(userId,"user"), message: "Ombi la malipo limesajiliwa." };
+      const paymentId = randomId();
       await sql`INSERT INTO dreamvora_payments (id,user_id,phone_used,amount,currency,provider,provider_order_id,reference,channel,status,provider_status) VALUES (${paymentId},${userId},${phoneUsed},${PAYMENT_AMOUNT},'TZS','ZONMPAY',${data.providerOrderId || null},${data.reference || null},${data.channel || null},'PUSH_SENT',${data.providerStatus || 'PENDING'})`;
-      return { status: "PUSH_SENT", paymentId, token: tokenFor(userId,"user"), message: "USSD Push imetumwa. Ukishalipia, bonyeza NIMELIPIA." };
+      return { status: "PUSH_SENT", paymentId, token: await tokenFor(userId,"user"), message: "USSD Push imetumwa. Ukishalipia, bonyeza NIMELIPIA." };
     } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
   });
 
@@ -166,19 +204,19 @@ export const checkDreamVoraPayment = createServerFn({ method: "POST" })
 
 export const adminLoginDreamVora = createServerFn({ method: "POST" })
   .inputValidator((input: { password: string }) => input)
-  .handler(async ({ data }) => { const password=process.env.DREAMVORA_ADMIN_PASSWORD; if(!password||data.password!==password) throw new Error("Password ya admin si sahihi."); return {token:tokenFor("admin","admin")}; });
+  .handler(async ({ data }) => { const password=env("DREAMVORA_ADMIN_PASSWORD"); if(!password||data.password!==password) throw new Error("Password ya admin si sahihi."); return {token:await tokenFor("admin","admin")}; });
 
 export const adminListDreamVoraPayments = createServerFn({ method: "POST" })
   .inputValidator((input: { token: string }) => input)
-  .handler(async ({data}) => { verifyToken(data.token,"admin"); const sql=db(); try { await ensureSchema(sql); const rows=await sql`SELECT p.id,p.phone_used,p.amount,p.currency,p.provider,p.provider_order_id,p.reference,p.channel,p.status,p.provider_status,p.submitted_at,p.confirmed_at,p.approved_at,p.rejected_at,p.transid,u.id AS user_id,u.name,u.username,u.phone AS account_phone,u.email FROM dreamvora_payments p JOIN dreamvora_users u ON u.id=p.user_id ORDER BY CASE WHEN p.status='PENDING_ADMIN' THEN 0 WHEN p.status='PUSH_SENT' THEN 1 ELSE 2 END,p.submitted_at DESC LIMIT 200`; return {payments:rows.map(r=>({...r,amount:Number(r.amount),submitted_at:String(r.submitted_at),confirmed_at:r.confirmed_at?String(r.confirmed_at):null,approved_at:r.approved_at?String(r.approved_at):null,rejected_at:r.rejected_at?String(r.rejected_at):null}))}; } finally { await sql.end({timeout:1}).catch(()=>undefined); } });
+  .handler(async ({data}) => { await verifyToken(data.token,"admin"); const sql=db(); try { await ensureSchema(sql); const rows=await sql`SELECT p.id,p.phone_used,p.amount,p.currency,p.provider,p.provider_order_id,p.reference,p.channel,p.status,p.provider_status,p.submitted_at,p.confirmed_at,p.approved_at,p.rejected_at,p.transid,u.id AS user_id,u.name,u.username,u.phone AS account_phone,u.email FROM dreamvora_payments p JOIN dreamvora_users u ON u.id=p.user_id ORDER BY CASE WHEN p.status='PENDING_ADMIN' THEN 0 WHEN p.status='PUSH_SENT' THEN 1 ELSE 2 END,p.submitted_at DESC LIMIT 200`; return {payments:rows.map(r=>({...r,amount:Number(r.amount),submitted_at:String(r.submitted_at),confirmed_at:r.confirmed_at?String(r.confirmed_at):null,approved_at:r.approved_at?String(r.approved_at):null,rejected_at:r.rejected_at?String(r.rejected_at):null}))}; } finally { await sql.end({timeout:1}).catch(()=>undefined); } });
 
 export const adminApproveDreamVoraPayment = createServerFn({ method: "POST" })
   .inputValidator((input: { token: string; paymentId: string }) => input)
-  .handler(async ({data}) => { verifyToken(data.token,"admin"); const sql=db(); try { await ensureSchema(sql); const rows=await sql`SELECT id,user_id,status FROM dreamvora_payments WHERE id=${data.paymentId} LIMIT 1`; const p=rows[0]; if(!p) throw new Error("Malipo hayajapatikana."); if(String(p.status)!=="PENDING_ADMIN") throw new Error("Admin anaweza ku-approve baada ya user kubonyeza NIMELIPIA."); await sql.begin(async tx=>{ await tx`UPDATE dreamvora_payments SET status='APPROVED',approved_at=NOW(),rejected_at=NULL WHERE id=${data.paymentId}`; await tx`UPDATE dreamvora_payments SET status='REJECTED',rejected_at=NOW() WHERE user_id=${p.user_id} AND id<>${data.paymentId} AND status IN ('PENDING_ADMIN','PUSH_SENT')`; await tx`UPDATE dreamvora_users SET paid=TRUE WHERE id=${p.user_id}`; }); return {ok:true,status:"APPROVED"}; } finally { await sql.end({timeout:1}).catch(()=>undefined); } });
+  .handler(async ({data}) => { await verifyToken(data.token,"admin"); const sql=db(); try { await ensureSchema(sql); const rows=await sql`SELECT id,user_id,status FROM dreamvora_payments WHERE id=${data.paymentId} LIMIT 1`; const p=rows[0]; if(!p) throw new Error("Malipo hayajapatikana."); if(String(p.status)!=="PENDING_ADMIN") throw new Error("Admin anaweza ku-approve baada ya user kubonyeza NIMELIPIA."); await sql.begin(async tx=>{ await tx`UPDATE dreamvora_payments SET status='APPROVED',approved_at=NOW(),rejected_at=NULL WHERE id=${data.paymentId}`; await tx`UPDATE dreamvora_payments SET status='REJECTED',rejected_at=NOW() WHERE user_id=${p.user_id} AND id<>${data.paymentId} AND status IN ('PENDING_ADMIN','PUSH_SENT')`; await tx`UPDATE dreamvora_users SET paid=TRUE WHERE id=${p.user_id}`; }); return {ok:true,status:"APPROVED"}; } finally { await sql.end({timeout:1}).catch(()=>undefined); } });
 
 export const adminRejectDreamVoraPayment = createServerFn({ method: "POST" })
   .inputValidator((input: { token: string; paymentId: string }) => input)
-  .handler(async ({data}) => { verifyToken(data.token,"admin"); const sql=db(); try { await ensureSchema(sql); await sql`UPDATE dreamvora_payments SET status='REJECTED',rejected_at=NOW() WHERE id=${data.paymentId}`; return {ok:true,status:"REJECTED"}; } finally { await sql.end({timeout:1}).catch(()=>undefined); } });
+  .handler(async ({data}) => { await verifyToken(data.token,"admin"); const sql=db(); try { await ensureSchema(sql); await sql`UPDATE dreamvora_payments SET status='REJECTED',rejected_at=NOW() WHERE id=${data.paymentId}`; return {ok:true,status:"REJECTED"}; } finally { await sql.end({timeout:1}).catch(()=>undefined); } });
 
 function findWebhookValue(value: unknown, keys: string[]): string | null { if(!value||typeof value!=="object") return null; const r=value as Record<string,unknown>; for(const k of keys){const v=r[k]; if(v!==undefined&&v!==null&&String(v)!=="") return String(v);} for(const child of Object.values(r)){const nested=findWebhookValue(child,keys); if(nested)return nested;} return null; }
 
