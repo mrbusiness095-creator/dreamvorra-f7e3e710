@@ -2,8 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Flag } from "@/components/dv";
 import { usersDatabase } from "@/data/users";
-import { getAccount, getSession, logout, saveServerAccount, withdrawBalance, type DreamVoraAccount } from "@/lib/local-storage";
-import { getDreamVoraAccount } from "@/lib/dreamvora.server";
+import { getAccount, logout, withdrawBalance, type DreamVoraAccount } from "@/lib/local-storage";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — DreamVora" }, { name: "robots", content: "noindex, nofollow" }] }),
@@ -19,14 +18,17 @@ function DashboardPage() {
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = getSession();
-    if (!token) { navigate({ to: "/register" }); return; }
-    void getDreamVoraAccount({ data: { token } }).then((result) => {
-      saveServerAccount(result.account);
-      if (!result.account.paid) { navigate({ to: "/payment" }); return; }
-      setAccount({ ...result.account, withdrawals: getAccount()?.withdrawals ?? [] });
-      setPhone(result.account.phone);
-    }).catch(() => { navigate({ to: "/login" }); });
+    const saved = getAccount();
+    if (!saved) {
+      navigate({ to: "/register" });
+      return;
+    }
+    if (!saved.paid) {
+      navigate({ to: "/payment" });
+      return;
+    }
+    setAccount(saved);
+    setPhone(saved.phone);
   }, [navigate]);
 
   const pageUsers = useMemo(() => usersDatabase.slice(0, 9), []);
@@ -116,7 +118,7 @@ function DashboardPage() {
                 <div><strong>WANTS :</strong> {user.wants}</div>
               </div>
               <button
-                onClick={() => navigate({ to: "/chat/$name", params: { name: encodeURIComponent(user.name) } })}
+                onClick={() => navigate({ to: "/chat/$name", params: { name: user.name } })}
                 className="mt-3 w-full rounded-xl bg-k-indigo px-3 py-2 text-[11px] font-bold text-white"
               >
                 💬 START CHAT

@@ -24,6 +24,10 @@ DreamVora uses TanStack Start SSR, so requests must reach the server function.
 - Do not replace the TanStack Start routes with a static `index.html` fallback.
 - Vercel should be allowed to auto-detect the TanStack Start/Nitro deployment.
 
-
-## ZonmPay live payments
-Set `ZONMPAY_API_KEY` in Netlify Environment Variables. Do not put the key in frontend code, GitHub, or this ZIP. Register `https://dreamvorra.site/api/zonmpay/webhook` in ZonmPay Developer Settings so successful payment events can automatically activate accounts.
+## DreamVora final payment flow
+- Registration UI remains the working local-storage registration flow from the Lipa Namba build.
+- Payment uses ZonmPay USSD Push.
+- After the push is paid, the user must press NIMELIPIA.
+- Admin reviews PENDING_ADMIN requests at /admin and approves/rejects.
+- Approval unlocks the account and returns the user to the pending chat.
+- Set ZONMPAY_API_KEY, ZONMPAY_BASE_URL, ZONMPAY_WEBHOOK_URL, NETLIFY_DB_URL, DREAMVORA_AUTH_SECRET and DREAMVORA_ADMIN_PASSWORD in Netlify.

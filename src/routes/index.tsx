@@ -250,7 +250,7 @@ function Index() {
                 <button
                   className="dv-home-chat"
                   onClick={() =>
-                    navigate({ to: "/chat/$name", params: { name: encodeURIComponent(user.name) } })
+                    navigate({ to: "/chat/$name", params: { name: user.name } })
                   }
                 >
                   💬 START CHAT

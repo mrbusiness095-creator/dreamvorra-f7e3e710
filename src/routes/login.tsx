@@ -1,8 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import logo from "@/assets/dreamvora-logo.png.asset.json";
-import { getAccount, getSession, saveServerAccount, saveSession } from "@/lib/local-storage";
-import { loginDreamVoraAccount } from "@/lib/dreamvora.server";
+import { getAccount } from "@/lib/local-storage";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Ingia — DreamVora" }, { name: "robots", content: "noindex, nofollow" }] }),
@@ -18,23 +17,21 @@ function LoginPage() {
 
   useEffect(() => {
     const account = getAccount();
-    if (account && getSession()) navigate({ to: account.paid ? "/dashboard" : "/payment" });
+    if (account) navigate({ to: account.paid ? "/dashboard" : "/payment" });
   }, [navigate]);
 
-  async function onSubmit(e: React.FormEvent) {
+  function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    try {
-      const result = await loginDreamVoraAccount({ data: { username, password } });
-      saveSession(result.token);
-      saveServerAccount(result.account);
-      navigate({ to: result.account.paid ? "/dashboard" : "/payment" });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Login imeshindikana.");
-    } finally {
+    const account = getAccount();
+    if (!account || account.username.toLowerCase() !== username.trim().toLowerCase() || account.password !== password) {
+      setError("Username au password si sahihi.");
       setLoading(false);
+      return;
     }
+    setLoading(false);
+    navigate({ to: account.paid ? "/dashboard" : "/payment" });
   }
 
   return (
