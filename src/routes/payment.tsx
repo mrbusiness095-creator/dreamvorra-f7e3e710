@@ -255,7 +255,7 @@ function PaymentPage() {
 
           <div className="payment-verify-box">
             <h3>Thibitisha kuwa umelipia</h3>
-            <p>Baada ya kutuma TZS {PAYMENT_AMOUNT.toLocaleString()} kwenye Lipa Namba <strong>354136248</strong>, weka namba iliyotumika kulipia hapa chini.</p>
+            <p>Baada ya kutuma TZS {PAYMENT_AMOUNT.toLocaleString()} kwenye Lipa Namba <strong>251161660</strong>, weka namba iliyotumika kulipia hapa chini.</p>
             <form onSubmit={submitPaymentRequest} className="payment-verify-form">
               <input value={phoneUsed} onChange={(e) => setPhoneUsed(e.target.value.replace(/[^0-9+]/g, ""))} inputMode="tel" placeholder="06XXXXXXXX" required />
               <button type="submit" disabled={submitting || requestStatus === "pending"}>{submitting ? "Inatuma..." : requestStatus === "pending" ? "INASUBIRI UTHIBITISHO" : "NIMELIPIA"}</button>
