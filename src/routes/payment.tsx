@@ -145,7 +145,8 @@ function PaymentPage() {
           <div>
             <h2>LINDA PESA YAKO</h2>
             <p>
-              Lipia kupitia mfumo huu pekee. Malipo nje ya mfumo huu ni batili na hayatakubaliwa.
+              Lipia kupitia mfumo huu pekee. Malipo nje ya mfumo huu ni batili na hayatakubaliwa
+              OFA YA LEO LIPIA ELF 12,000TZS.
             </p>
           </div>
         </div>
@@ -262,7 +263,7 @@ function PaymentPage() {
             </form>
             {requestStatus === "pending" && <div className="payment-status pending">⏳ Ombi limepokelewa. Admin anakagua malipo yako.</div>}
             {requestStatus === "approved" && <div className="payment-status approved">✓ Malipo yameidhinishwa. Tunaelekeza kwenye Chat...</div>}
-            {requestStatus === "rejected" && <div className="payment-status rejected">✕ Ombi limekataliwa. Fanya MALIPO .</div>}
+            {requestStatus === "rejected" && <div className="payment-status rejected">✕ Ombi limekataliwa. Fanya MALIPO.</div>}
             {paymentMessage && requestStatus === "idle" && <div className="payment-status pending">{paymentMessage}</div>}
           </div>
         </section>
