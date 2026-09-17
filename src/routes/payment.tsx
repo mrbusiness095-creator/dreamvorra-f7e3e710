@@ -32,6 +32,8 @@ function PaymentPage() {
   const [requestStatus, setRequestStatus] = useState<"idle" | "pending" | "approved" | "rejected">("idle");
   const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [verifyStep, setVerifyStep] = useState<"intro" | "form">("intro");
+  const [paymentReminderOpen, setPaymentReminderOpen] = useState(false);
 
   useEffect(() => {
     const account = getAccount();
@@ -65,6 +67,10 @@ function PaymentPage() {
 
   async function submitPaymentRequest(e: React.FormEvent) {
     e.preventDefault();
+    if (verifyStep === "intro") {
+      setPaymentReminderOpen(true);
+      return;
+    }
     setPaymentMessage(null);
     const token = getSession();
     if (!token) { navigate({ to: "/login" }); return; }
@@ -255,17 +261,42 @@ function PaymentPage() {
           />
 
           <div className="payment-verify-box">
-            <h3>Thibitisha kuwa umelipia</h3>
-            <p>Baada ya kutuma TZS {PAYMENT_AMOUNT.toLocaleString()} kwenye Lipa Namba <strong>251226427</strong>, weka namba iliyotumika kulipia hapa chini.</p>
-            <form onSubmit={submitPaymentRequest} className="payment-verify-form">
-              <input value={phoneUsed} onChange={(e) => setPhoneUsed(e.target.value.replace(/[^0-9+]/g, ""))} inputMode="tel" placeholder="06XXXXXXXX" required />
-              <button type="submit" disabled={submitting || requestStatus === "pending"}>{submitting ? "Inatuma..." : requestStatus === "pending" ? "INASUBIRI UTHIBITISHO" : "NIMELIPIA"}</button>
-            </form>
-            {requestStatus === "pending" && <div className="payment-status pending">⏳ Ombi limepokelewa. Admin anakagua malipo yako.</div>}
-            {requestStatus === "approved" && <div className="payment-status approved">✓ Malipo yameidhinishwa. Tunaelekeza kwenye Chat...</div>}
-            {requestStatus === "rejected" && <div className="payment-status rejected">✕ Ombi limekataliwa. Fanya MALIPO.</div>}
-            {paymentMessage && requestStatus === "idle" && <div className="payment-status pending">{paymentMessage}</div>}
+            {verifyStep === "intro" ? (
+              <div className="payment-verify-intro">
+                <div className="payment-verify-icon" aria-hidden="true">✓</div>
+                <h3>Umeshafanya malipo?</h3>
+                <p>Ukishamaliza malipo, gusa <strong>NIMELIPIA</strong> tena ili kuweka namba ya simu uliyotumia kulipia.</p>
+                <form onSubmit={submitPaymentRequest} className="payment-verify-form payment-verify-single">
+                  <button type="submit" className="payment-verify-start">NIMELIPIA</button>
+                </form>
+              </div>
+            ) : (
+              <>
+                <h3>Thibitisha kuwa umelipia</h3>
+                <p>Baada ya kufanya malipo ya TZS {PAYMENT_AMOUNT.toLocaleString()}, weka namba iliyotumika kulipia hapa chini kisha gusa <strong>NIMELIPIA</strong>.</p>
+                <form onSubmit={submitPaymentRequest} className="payment-verify-form">
+                  <input value={phoneUsed} onChange={(e) => setPhoneUsed(e.target.value.replace(/[^0-9+]/g, ""))} inputMode="tel" placeholder="06XXXXXXXX" required />
+                  <button type="submit" disabled={submitting || requestStatus === "pending"}>{submitting ? "Inatuma..." : requestStatus === "pending" ? "INASUBIRI UTHIBITISHO" : "NIMELIPIA"}</button>
+                </form>
+                {requestStatus === "pending" && <div className="payment-status pending">⏳ Ombi limepokelewa. Admin anakagua malipo yako.</div>}
+                {requestStatus === "approved" && <div className="payment-status approved">✓ Malipo yameidhinishwa. Tunaelekeza kwenye Chat...</div>}
+                {requestStatus === "rejected" && <div className="payment-status rejected">✕ Ombi limekataliwa. Fanya MALIPO kisha ujaribu tena.</div>}
+                {paymentMessage && requestStatus === "idle" && <div className="payment-status pending">{paymentMessage}</div>}
+              </>
+            )}
           </div>
+
+          {paymentReminderOpen && (
+            <div className="payment-confirm-backdrop" role="dialog" aria-modal="true" aria-labelledby="payment-reminder-title">
+              <div className="payment-confirm-modal">
+                <button type="button" className="payment-confirm-close" aria-label="Funga" onClick={() => setPaymentReminderOpen(false)}>×</button>
+                <div className="payment-confirm-icon" aria-hidden="true">▰</div>
+                <h2 id="payment-reminder-title">FANYA MALIPO KISHA<br />JARIBU TENA</h2>
+                <p>Kamilisha malipo ya TZS {PAYMENT_AMOUNT.toLocaleString()} kwa kutumia njia ya malipo iliyo hapo juu.</p>
+                <button type="button" className="payment-confirm-button" onClick={() => { setPaymentReminderOpen(false); setVerifyStep("form"); }}>Sawa</button>
+              </div>
+            </div>
+          )}
         </section>
       </main>
     </div>

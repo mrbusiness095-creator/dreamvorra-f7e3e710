@@ -701,3 +701,22 @@
 
 .payment-verify-box{margin-top:22px;border:1px solid rgba(30,41,59,.12);border-radius:20px;background:#fff;padding:20px;box-shadow:0 10px 30px rgba(15,23,42,.06)}
 .payment-verify-box h3{margin:0;font-size:18px;font-weight:800;color:#0f172a}.payment-verify-box p{margin:7px 0 14px;font-size:13px;line-height:1.55;color:#64748b}.payment-verify-form{display:grid;grid-template-columns:1fr auto;gap:10px}.payment-verify-form input{min-width:0;border:1px solid #cbd5e1;border-radius:12px;padding:12px 13px;font:inherit;outline:none}.payment-verify-form input:focus{border-color:#4f46e5;box-shadow:0 0 0 3px rgba(79,70,229,.12)}.payment-verify-form button{border:0;border-radius:12px;background:#16a34a;color:#fff;font-weight:800;padding:12px 16px;cursor:pointer}.payment-verify-form button:disabled{opacity:.55;cursor:not-allowed}.payment-status{margin-top:12px;border-radius:12px;padding:11px 12px;font-size:12px;font-weight:700}.payment-status.pending{background:#fff7ed;color:#9a3412}.payment-status.approved{background:#ecfdf5;color:#047857}.payment-status.rejected{background:#fef2f2;color:#b91c1c}@media(max-width:560px){.payment-verify-form{grid-template-columns:1fr}.payment-verify-form button{width:100%}}
+
+/* Two-step payment confirmation flow */
+.payment-verify-intro{text-align:center}
+.payment-verify-icon{width:46px;height:46px;margin:0 auto 10px;display:grid;place-items:center;border-radius:50%;background:#ecfdf5;color:#047857;font-size:24px;font-weight:900}
+.payment-verify-intro h3{margin:0;font-size:18px;font-weight:800;color:#0f172a}
+.payment-verify-intro p{max-width:520px;margin:7px auto 14px;font-size:13px;line-height:1.55;color:#64748b}
+.payment-verify-single{display:block}
+.payment-verify-start{width:100%;border:0;border-radius:12px;background:#16a34a;color:#fff;font-weight:800;padding:13px 16px;cursor:pointer;box-shadow:0 8px 18px rgba(22,163,74,.16)}
+.payment-verify-start:hover{opacity:.93}
+.payment-confirm-backdrop{position:fixed;inset:0;z-index:120;display:grid;place-items:center;padding:20px;background:rgba(8,24,20,.62);backdrop-filter:blur(7px)}
+.payment-confirm-modal{position:relative;width:min(520px,100%);padding:38px 28px 26px;text-align:center;border-radius:28px;background:#fff;box-shadow:0 28px 80px rgba(0,0,0,.3);animation:payment-confirm-in .2s ease-out}
+@keyframes payment-confirm-in{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+.payment-confirm-close{position:absolute;right:17px;top:13px;border:0;background:transparent;color:#64748b;font-size:30px;line-height:1;cursor:pointer;padding:3px 7px}
+.payment-confirm-icon{width:58px;height:48px;margin:0 auto 16px;display:grid;place-items:center;border-radius:9px;background:#fbbf24;color:#fff;font-size:25px;font-weight:900;box-shadow:inset 0 -8px 0 rgba(0,0,0,.06)}
+.payment-confirm-modal h2{margin:0;color:#123f33;font-size:25px;line-height:1.25;font-weight:900;letter-spacing:.2px}
+.payment-confirm-modal p{margin:14px auto 20px;max-width:430px;color:#64748b;font-size:15px;line-height:1.55}
+.payment-confirm-button{width:100%;border:0;border-radius:14px;background:#c8103c;color:#fff;font:800 16px var(--font-jost);padding:15px 18px;cursor:pointer;box-shadow:0 10px 22px rgba(200,16,60,.2)}
+.payment-confirm-button:hover{opacity:.94}
+@media(max-width:560px){.payment-confirm-modal{padding:34px 18px 20px;border-radius:24px}.payment-confirm-modal h2{font-size:21px}.payment-confirm-modal p{font-size:14px}}
