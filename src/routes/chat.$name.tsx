@@ -71,7 +71,7 @@ function ChatPage() {
           setEarnedAmount(completedAmount || 0);
           // Re-submit the same server-side reward key. The server uses a unique
           // key, so this is safe and also recovers a reward after refresh.
-          void claimReward();
+          void claimReward(10);
         }
         return;
       }
@@ -100,7 +100,7 @@ function ChatPage() {
     }, delay);
   }
 
-  async function claimReward() {
+  async function claimReward(completedMessageCount = 10) {
     const token = getSession();
     const localAccount = getAccount();
     if (!token || !localAccount?.id) {
@@ -110,7 +110,7 @@ function ChatPage() {
     setRewardError(null);
     try {
       const chatKey = `${localAccount.id}:${storageKey}:completed`;
-      const result = await recordDreamVoraChatEarning({ data: { token, chatKey, amount: user.money, personName: user.name, messageCount: myMessageCount } });
+      const result = await recordDreamVoraChatEarning({ data: { token, chatKey, amount: user.money, personName: user.name, messageCount: Math.max(10, completedMessageCount) } });
       const updated = { ...localAccount, earnings: Number(result.earnings), balance: Number(result.balance), paid: true };
       saveAccount(updated);
       setAccount(updated);
@@ -147,7 +147,7 @@ function ChatPage() {
     scheduleForeignerReply(nextMessage);
 
     if (nextCount === 10) {
-      await claimReward();
+      await claimReward(nextCount);
     }
   }
 

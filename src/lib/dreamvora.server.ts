@@ -47,6 +47,17 @@ async function ensureSchema(sql: ReturnType<typeof postgres>) {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+  // Older deployments may already have dreamvora_chat_earnings plus a database
+  // trigger/function that expects a `name` column. Keep that legacy table
+  // compatible even though new rewards are written to dreamvora_chat_rewards.
+  // This migration is intentionally additive and does not delete old data.
+  await sql`ALTER TABLE dreamvora_chat_earnings ADD COLUMN IF NOT EXISTS name TEXT`;
+  await sql`
+    UPDATE dreamvora_chat_earnings e
+    SET name = u.name
+    FROM dreamvora_users u
+    WHERE e.user_id = u.id AND (e.name IS NULL OR e.name = '')
+  `;
   await sql`CREATE INDEX IF NOT EXISTS dreamvora_chat_earnings_user_idx ON dreamvora_chat_earnings(user_id, created_at DESC)`;
   // Use a dedicated reward ledger for completed chats. This intentionally does
   // not depend on the legacy dreamvora_chat_earnings table, which may exist
