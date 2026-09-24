@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import logo from "@/assets/dreamvora-logo.png.asset.json";
+import { DreamVoraBrand } from "@/components/dv";
 import { clearPendingChat, getAccount, getPendingChat, saveServerAccount, saveSession } from "@/lib/local-storage";
 import { registerDreamVoraAccount } from "@/lib/dreamvora.server";
 
@@ -91,7 +91,7 @@ function RegisterPage() {
         <div className="k-card grid grid-cols-1 lg:grid-cols-12">
           <aside className="hidden bg-k-dark p-10 text-white lg:col-span-5 lg:flex lg:flex-col">
             <div className="mb-10 inline-flex w-fit rounded-xl bg-white px-3 py-2">
-              <img src={logo.url} alt="DREAMVORA" className="h-8 w-auto object-contain" />
+              <DreamVoraBrand />
             </div>
             <h2 className="text-2xl font-bold">Join our community</h2>
             <p className="mt-3 text-sm text-white/60">

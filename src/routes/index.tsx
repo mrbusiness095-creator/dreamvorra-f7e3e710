@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Flag, Modal, RegisterButton, BackButton } from "@/components/dv";
+import { DreamVoraBrand, Flag, Modal, RegisterButton, BackButton } from "@/components/dv";
 import { usersDatabase } from "@/data/users";
 import { getSession } from "@/lib/local-storage";
 
@@ -102,7 +102,7 @@ function HomeHeader({
   return (
     <header className="dv-home-header">
       <a href="/" className="dv-home-logo-link" aria-label="DreamVora Home">
-        <img src="/dreamvora-logo.svg" alt="DreamVora Logo" className="dv-home-logo" />
+        <DreamVoraBrand />
       </a>
 
       <div className="dv-home-online">
@@ -148,11 +148,7 @@ function HomeFooter({
     <footer className="dv-home-footer">
       <div className="dv-home-footer-content">
         <div>
-          <img
-            src="/dreamvora-logo-white.svg"
-            alt="DreamVora"
-            className="dv-home-footer-logo"
-          />
+          <DreamVoraBrand white />
           <p>
             Connect, Learn, Earn.
             <br />

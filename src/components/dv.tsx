@@ -1,7 +1,14 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
-import logo from "@/assets/dreamvora-logo.png.asset.json";
 
+export function DreamVoraBrand({ white = false }: { white?: boolean }) {
+  return (
+    <div className="flex items-center gap-2" aria-label="DreamVora">
+      <span className={`grid size-9 shrink-0 place-items-center rounded-xl text-base font-black shadow-sm ${white ? "bg-white text-[#0d1b3e]" : "bg-[linear-gradient(135deg,#10bfae,#12a7e8)] text-white"}`}>D</span>
+      <span className={`text-[18px] font-black tracking-tight ${white ? "text-white" : "text-[#0d1b3e]"}`}>DREAMVORA</span>
+    </div>
+  );
+}
 
 export function redirectToRegister() {
   window.location.href = "/register";
@@ -35,7 +42,7 @@ export function Header({ onWithdraw, onBalance, currentBalance }: { onWithdraw: 
   return (
     <header className="sticky top-0 z-40 flex items-center justify-between gap-2 border-b border-border bg-card px-3 py-2 shadow-[var(--shadow-header)]">
       <Link to="/" className="shrink-0">
-        <img src={logo.url} alt="DreamVora" className="h-9 w-auto" />
+        <DreamVoraBrand />
       </Link>
 
       <div className="flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1 text-[11px] font-semibold text-secondary-foreground">
@@ -83,7 +90,7 @@ export function Footer({ onWithdraw }: { onWithdraw: () => void }) {
     <footer className="mt-8 bg-[image:var(--gradient-brand)] px-5 py-8 text-primary-foreground">
       <div className="mx-auto grid max-w-4xl gap-6 sm:grid-cols-2">
         <div>
-          <img src={logo.url} alt="DreamVora" className="mb-3 h-10 w-auto rounded-md bg-background p-1" />
+          <DreamVoraBrand white />
           <p className="text-xs leading-relaxed opacity-80">
             Connect, Learn, Earn.
             <br />

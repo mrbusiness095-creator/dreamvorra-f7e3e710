@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import logo from "@/assets/dreamvora-logo.png.asset.json";
+import { DreamVoraBrand } from "@/components/dv";
 import { clearReturnTo, getAccount, getReturnTo, getSession, saveServerAccount, saveSession } from "@/lib/local-storage";
 import { loginDreamVoraAccount } from "@/lib/dreamvora.server";
 
@@ -47,7 +47,7 @@ function LoginPage() {
           <aside className="k-brand-side hidden p-10 text-white lg:col-span-5 lg:flex lg:flex-col">
             <h2 className="text-3xl font-bold leading-tight">Welcome<br />Back.</h2>
             <p className="mt-3 text-sm text-white/75">Ingia kwenye akaunti yako na endelea na malipo yako.</p>
-            <img src={logo.url} alt="DREAMVORA" className="mt-auto h-10 w-auto object-contain" />
+            <DreamVoraBrand white />
           </aside>
           <section className="p-6 md:p-10 lg:col-span-7">
             <h1 className="text-2xl font-bold text-k-slate-900">Login</h1>

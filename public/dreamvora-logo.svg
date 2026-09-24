@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 120" role="img" aria-label="DreamVora">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#10bfae"/><stop offset="1" stop-color="#12a7e8"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="112" height="112" rx="30" fill="url(#g)"/>
+  <path d="M37 33h28c17 0 29 10 29 27s-12 27-29 27H37V33zm23 42c9 0 15-5 15-15s-6-15-15-15H52v30h8z" fill="#fff"/>
+  <circle cx="93" cy="27" r="7" fill="#0b2742"/>
+  <text x="138" y="78" font-family="Arial, Helvetica, sans-serif" font-size="58" font-weight="800" fill="#0d1b3e">DREAMVORA</text>
+</svg>

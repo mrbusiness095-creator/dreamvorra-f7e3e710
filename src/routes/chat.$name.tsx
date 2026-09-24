@@ -46,6 +46,7 @@ function ChatPage() {
   const [withdrawNotice, setWithdrawNotice] = useState<string | null>(null);
   const [chatClosed, setChatClosed] = useState(false);
   const [earnedAmount, setEarnedAmount] = useState(0);
+  const [typing, setTyping] = useState(false);
   const myMessageCount = useMemo(() => messages.filter((m) => m.from === "me").length, [messages]);
 
   useEffect(() => {
@@ -79,17 +80,34 @@ function ChatPage() {
 
   if (!user) return <div className="flex min-h-screen items-center justify-center bg-background px-6 text-center"><div><p className="text-sm text-muted-foreground">Mtumiaji hakupatikana.</p><button onClick={() => navigate({ to: "/" })} className="mt-4 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">Rudi Nyumbani</button></div></div>;
 
+  function scheduleForeignerReply(message: Message) {
+    setTyping(true);
+    const delay = 900 + Math.floor(Math.random() * 1200);
+    window.setTimeout(() => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `reply-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          from: "foreigner",
+          text: generateForeignerReply(message.text, user.name, user.wants),
+          time: nowTime(),
+        },
+      ]);
+      setTyping(false);
+    }, delay);
+  }
+
   async function send() {
-    if (!text.trim() || chatClosed) return;
+    if (!text.trim() || chatClosed || typing) return;
     const current = getAccount();
-    const nextMessage: Message = { id: `me-${Date.now()}`, from: "me", text: text.trim(), time: nowTime() };
+    const nextMessage: Message = { id: `me-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, from: "me", text: text.trim(), time: nowTime() };
 
     if (!current) {
       const guestMessages = messages.filter((m) => m.from === "me").length;
       if (guestMessages >= 1) { setPendingChat(user.name); setLocked(true); return; }
       setMessages((prev) => [...prev, nextMessage]);
       setText("");
-      window.setTimeout(() => setMessages((prev) => [...prev, { id: `reply-${Date.now()}`, from: "foreigner", text: generateForeignerReply(nextMessage.text, user.name, user.wants), time: nowTime() }]), 500);
+      scheduleForeignerReply(nextMessage);
       setPendingChat(user.name);
       window.setTimeout(() => setLocked(true), 250);
       return;
@@ -100,7 +118,7 @@ function ChatPage() {
     setMessages((prev) => [...prev, nextMessage]);
     setText("");
 
-    window.setTimeout(() => setMessages((prev) => [...prev, { id: `reply-${Date.now()}`, from: "foreigner", text: generateForeignerReply(nextMessage.text, user.name, user.wants), time: nowTime() }]), 500);
+    scheduleForeignerReply(nextMessage);
 
     if (nextCount === 10) {
       const chatKey = `${storageKey}:completed`;
@@ -151,9 +169,10 @@ function ChatPage() {
     <main className="flex-1 space-y-3 overflow-y-auto px-3 py-4 pb-24">
       <div className="mx-auto max-w-md rounded-xl bg-secondary px-3 py-2 text-center text-[11px] text-secondary-foreground">💬 Unachati na {user.name} kwa muda wa {user.duration} dakika. Malipo kwa ujumbe 10: <strong>TZS {user.money.toLocaleString()}</strong>.</div>
       {messages.map((m) => <div key={m.id} className={m.from === "me" ? "flex justify-end" : "flex justify-start"}><div className="max-w-[82%]"><div className={m.from === "me" ? "rounded-2xl rounded-tr-sm bg-primary px-3.5 py-2.5 text-sm text-primary-foreground shadow-[var(--shadow-card)]" : "rounded-2xl rounded-tl-sm bg-card px-3.5 py-2.5 text-sm text-card-foreground shadow-[var(--shadow-card)]"}>{m.text}</div><div className={`mt-1 text-[10px] text-muted-foreground ${m.from === "me" ? "text-right" : ""}`}>{m.time}</div></div></div>)}
+      {typing && <div className="flex justify-start"><div className="rounded-2xl rounded-tl-sm bg-card px-4 py-3 text-sm text-muted-foreground shadow-[var(--shadow-card)]"><span className="inline-flex items-center gap-1"><span className="animate-bounce">●</span><span className="animate-bounce [animation-delay:120ms]">●</span><span className="animate-bounce [animation-delay:240ms]">●</span></span> {user.name} anaandika...</div></div>}
       {account?.paid && myMessageCount > 0 && <div className="mx-auto max-w-md text-center text-[10px] text-muted-foreground">Ujumbe wako: {myMessageCount} / 10 • Kila ujumbe 10 unalipa TZS {user.money.toLocaleString()}</div>}
     </main>
-    <div className="sticky bottom-0 flex items-center gap-2 border-t border-border bg-card px-3 py-2.5"><input disabled={chatClosed} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder={chatClosed ? "Chat imefungwa — ujumbe 10 umekamilika" : "Andika ujumbe..."} className="flex-1 rounded-full border border-border bg-secondary px-4 py-2.5 text-sm text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-60" /><button disabled={chatClosed} onClick={() => void send()} className="rounded-full bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">Tuma</button></div>
+    <div className="sticky bottom-0 flex items-center gap-2 border-t border-border bg-card px-3 py-2.5"><input disabled={chatClosed || typing} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder={chatClosed ? "Chat imefungwa — ujumbe 10 umekamilika" : "Andika ujumbe..."} className="flex-1 rounded-full border border-border bg-secondary px-4 py-2.5 text-sm text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-60" /><button disabled={chatClosed || typing} onClick={() => void send()} className="rounded-full bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">Tuma</button></div>
 
     <Modal open={chatClosed} onClose={() => undefined} icon="🎉" title="Umefanikiwa kulipwa!">
       <div className="rounded-2xl bg-emerald-50 p-4">
