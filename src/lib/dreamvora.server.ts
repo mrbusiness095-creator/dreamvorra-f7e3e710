@@ -24,9 +24,21 @@ async function ensureSchema(sql: ReturnType<typeof postgres>) {
       password_hash TEXT NOT NULL,
       paid BOOLEAN NOT NULL DEFAULT FALSE,
       balance INTEGER NOT NULL DEFAULT 0,
+      earnings INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+  await sql`ALTER TABLE dreamvora_users ADD COLUMN IF NOT EXISTS earnings INTEGER NOT NULL DEFAULT 0`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS dreamvora_chat_earnings (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES dreamvora_users(id) ON DELETE CASCADE,
+      chat_key TEXT NOT NULL UNIQUE,
+      amount INTEGER NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS dreamvora_chat_earnings_user_idx ON dreamvora_chat_earnings(user_id, created_at DESC)`;
   await sql`
     CREATE TABLE IF NOT EXISTS dreamvora_payments (
       id TEXT PRIMARY KEY,
@@ -119,7 +131,7 @@ function cleanPhone(value: string) {
 async function getUserByToken(sql: ReturnType<typeof postgres>, token: string) {
   const userId = verifyToken(token, "user");
   const rows = await sql`
-    SELECT id, name, username, phone, email, country, paid, balance
+    SELECT id, name, username, phone, email, country, paid, balance, earnings
     FROM dreamvora_users WHERE id = ${userId} LIMIT 1
   `;
   if (!rows[0]) throw new Error("Akaunti haijapatikana.");
@@ -144,7 +156,7 @@ export const registerDreamVoraAccount = createServerFn({ method: "POST" })
         INSERT INTO dreamvora_users (id, name, username, phone, email, country, password_hash)
         VALUES (${id}, ${data.name.trim()}, ${username}, ${phone}, ${email}, ${data.country}, ${hashPassword(data.password)})
       `;
-      return { token: tokenFor(id, "user"), account: { id, name: data.name.trim(), username, phone, email, country: data.country, paid: false, balance: 0 } };
+      return { token: tokenFor(id, "user"), account: { id, name: data.name.trim(), username, phone, email, country: data.country, paid: false, balance: 0, earnings: 0 } };
     } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
   });
 
@@ -154,10 +166,10 @@ export const loginDreamVoraAccount = createServerFn({ method: "POST" })
     const sql = db();
     try {
       await ensureSchema(sql);
-      const rows = await sql`SELECT id, name, username, phone, email, country, password_hash, paid, balance FROM dreamvora_users WHERE LOWER(username) = LOWER(${data.username.trim()}) LIMIT 1`;
+      const rows = await sql`SELECT id, name, username, phone, email, country, password_hash, paid, balance, earnings FROM dreamvora_users WHERE LOWER(username) = LOWER(${data.username.trim()}) LIMIT 1`;
       const user = rows[0];
       if (!user || !verifyPassword(data.password, String(user.password_hash))) throw new Error("Username au password si sahihi.");
-      return { token: tokenFor(String(user.id), "user"), account: { id: user.id, name: user.name, username: user.username, phone: user.phone, email: user.email, country: user.country, paid: Boolean(user.paid), balance: Number(user.balance) } };
+      return { token: tokenFor(String(user.id), "user"), account: { id: user.id, name: user.name, username: user.username, phone: user.phone, email: user.email, country: user.country, paid: Boolean(user.paid), balance: Number(user.balance), earnings: Number(user.earnings ?? 0) } };
     } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
   });
 
@@ -165,8 +177,33 @@ export const getDreamVoraAccount = createServerFn({ method: "POST" })
   .inputValidator((input: { token: string }) => input)
   .handler(async ({ data }) => {
     const sql = db();
-    try { await ensureSchema(sql); const user = await getUserByToken(sql, data.token); return { token: tokenFor(String(user.id), "user"), account: { ...user, id: String(user.id), balance: Number(user.balance), paid: Boolean(user.paid) } }; }
+    try { await ensureSchema(sql); const user = await getUserByToken(sql, data.token); return { token: tokenFor(String(user.id), "user"), account: { ...user, id: String(user.id), balance: Number(user.balance), earnings: Number(user.earnings ?? 0), paid: Boolean(user.paid) } }; }
     finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
+  });
+
+export const recordDreamVoraChatEarning = createServerFn({ method: "POST" })
+  .inputValidator((input: { token: string; chatKey: string; amount: number }) => input)
+  .handler(async ({ data }) => {
+    const sql = db();
+    try {
+      await ensureSchema(sql);
+      const user = await getUserByToken(sql, data.token);
+      const amount = Math.floor(Number(data.amount));
+      const chatKey = data.chatKey.trim();
+      if (!Boolean(user.paid)) throw new Error("Akaunti haijaidhinishwa.");
+      if (!chatKey || !Number.isFinite(amount) || amount <= 0 || amount > 1000000) throw new Error("Malipo ya chat si sahihi.");
+      const inserted = await sql`
+        INSERT INTO dreamvora_chat_earnings (id, user_id, chat_key, amount)
+        VALUES (${randomUUID()}, ${user.id}, ${chatKey}, ${amount})
+        ON CONFLICT (chat_key) DO NOTHING
+        RETURNING id
+      `;
+      if (inserted[0]) {
+        await sql`UPDATE dreamvora_users SET earnings = earnings + ${amount} WHERE id = ${user.id}`;
+      }
+      const rows = await sql`SELECT balance, earnings FROM dreamvora_users WHERE id = ${user.id} LIMIT 1`;
+      return { added: Boolean(inserted[0]), amount, balance: Number(rows[0]?.balance ?? 0), earnings: Number(rows[0]?.earnings ?? 0) };
+    } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
   });
 
 export const getDreamVoraNotifications = createServerFn({ method: "POST" })
@@ -340,7 +377,7 @@ export const adminSetDreamVoraPaymentStatus = createServerFn({ method: "POST" })
         await sql.begin(async (tx) => {
           await tx`UPDATE dreamvora_payments SET status = 'APPROVED', approved_at = NOW(), rejected_at = NULL WHERE id = ${data.paymentId}`;
           await tx`UPDATE dreamvora_payments SET status = 'REJECTED', rejected_at = NOW() WHERE user_id = ${payment.user_id} AND id <> ${data.paymentId} AND status = 'PENDING'`;
-          await tx`UPDATE dreamvora_users SET paid = TRUE WHERE id = ${payment.user_id}`;
+          await tx`UPDATE dreamvora_users SET paid = TRUE, balance = balance + ${payment.amount} WHERE id = ${payment.user_id}`;
         });
       } else {
         await sql`UPDATE dreamvora_payments SET status = 'REJECTED', rejected_at = NOW() WHERE id = ${data.paymentId}`;

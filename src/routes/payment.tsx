@@ -60,7 +60,7 @@ function PaymentPage() {
     if (token) {
       void checkDreamVoraPayment({ data: { token } }).then((result) => {
         setRequestStatus(result.status === "APPROVED" ? "approved" : result.status === "REJECTED" ? "rejected" : result.status === "PENDING" ? "pending" : "idle");
-        if (result.status === "APPROVED") markPaid();
+        if (result.status === "APPROVED") markPaid(PAYMENT_AMOUNT);
       }).catch(() => undefined);
     }
   }, [navigate]);
@@ -103,7 +103,7 @@ function PaymentPage() {
     const timer = window.setInterval(() => {
       void checkDreamVoraPayment({ data: { token } }).then((result) => {
         if (result.status === "APPROVED") {
-          markPaid();
+          markPaid(PAYMENT_AMOUNT);
           setRequestStatus("approved");
           const pendingChat = getPendingChat();
           if (pendingChat) { clearPendingChat(); navigate({ to: "/chat/$name", params: { name: pendingChat } }); }

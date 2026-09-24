@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BackButton, Flag, Header, Modal } from "@/components/dv";
 import { findUser, firstMessageBroken, generateForeignerReply } from "@/data/users";
 import { addEarnings, getAccount, getSession, saveServerAccount, setPendingChat, withdrawBalance, type DreamVoraAccount } from "@/lib/local-storage";
-import { getDreamVoraAccount } from "@/lib/dreamvora.server";
+import { getDreamVoraAccount, recordDreamVoraChatEarning } from "@/lib/dreamvora.server";
 
 export const Route = createFileRoute("/chat/$name")({
   head: ({ params }) => ({
@@ -44,6 +44,8 @@ function ChatPage() {
   const [withdrawPhone, setWithdrawPhone] = useState("");
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [withdrawNotice, setWithdrawNotice] = useState<string | null>(null);
+  const [chatClosed, setChatClosed] = useState(false);
+  const [earnedAmount, setEarnedAmount] = useState(0);
   const myMessageCount = useMemo(() => messages.filter((m) => m.from === "me").length, [messages]);
 
   useEffect(() => {
@@ -59,7 +61,16 @@ function ChatPage() {
     }
     try {
       const raw = sessionStorage.getItem(storageKey);
-      if (raw) { setMessages(JSON.parse(raw) as Message[]); return; }
+      if (raw) {
+        const restored = JSON.parse(raw) as Message[];
+        setMessages(restored);
+        const completedAmount = Number(sessionStorage.getItem(`${storageKey}_earned`) || 0);
+        if (restored.filter((m) => m.from === "me").length >= 10) {
+          setChatClosed(true);
+          setEarnedAmount(completedAmount || user?.money || 0);
+        }
+        return;
+      }
     } catch { /* fresh state */ }
     if (user) setMessages([{ id: "foreigner-1", from: "foreigner", text: firstMessageBroken(user.name, user.wants), time: nowTime() }]);
   }, [storageKey, user]);
@@ -68,8 +79,8 @@ function ChatPage() {
 
   if (!user) return <div className="flex min-h-screen items-center justify-center bg-background px-6 text-center"><div><p className="text-sm text-muted-foreground">Mtumiaji hakupatikana.</p><button onClick={() => navigate({ to: "/" })} className="mt-4 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">Rudi Nyumbani</button></div></div>;
 
-  function send() {
-    if (!text.trim()) return;
+  async function send() {
+    if (!text.trim() || chatClosed) return;
     const current = getAccount();
     const nextMessage: Message = { id: `me-${Date.now()}`, from: "me", text: text.trim(), time: nowTime() };
 
@@ -88,11 +99,37 @@ function ChatPage() {
     const nextCount = messages.filter((m) => m.from === "me").length + 1;
     setMessages((prev) => [...prev, nextMessage]);
     setText("");
-    if (nextCount % 10 === 0) {
-      const updated = addEarnings(user.money);
-      if (updated) setAccount(updated);
+
+    window.setTimeout(() => setMessages((prev) => [...prev, { id: `reply-${Date.now()}`, from: "foreigner", text: generateForeignerReply(nextMessage.text, user.name, user.wants), time: nowTime() }]), 500);
+
+    if (nextCount === 10) {
+      const chatKey = `${storageKey}:completed`;
+      try {
+        const token = getSession();
+        if (token) {
+          const result = await recordDreamVoraChatEarning({ data: { token, chatKey, amount: user.money } });
+          if (result.added) {
+            const local = getAccount();
+            if (local) {
+              const updated = { ...local, earnings: result.earnings, balance: result.balance };
+              localStorage.setItem("dreamvora_account", JSON.stringify(updated));
+              setAccount(updated);
+            }
+          }
+          setEarnedAmount(result.amount);
+        } else {
+          const updated = addEarnings(user.money);
+          if (updated) setAccount(updated);
+          setEarnedAmount(user.money);
+        }
+      } catch {
+        const updated = addEarnings(user.money);
+        if (updated) setAccount(updated);
+        setEarnedAmount(user.money);
+      }
+      sessionStorage.setItem(`${storageKey}_earned`, String(user.money));
+      setChatClosed(true);
     }
-    setTimeout(() => setMessages((prev) => [...prev, { id: `reply-${Date.now()}`, from: "foreigner", text: generateForeignerReply(nextMessage.text, user.name, user.wants), time: nowTime() }]), 500);
   }
 
   function doWithdraw(e: React.FormEvent) {
@@ -116,8 +153,16 @@ function ChatPage() {
       {messages.map((m) => <div key={m.id} className={m.from === "me" ? "flex justify-end" : "flex justify-start"}><div className="max-w-[82%]"><div className={m.from === "me" ? "rounded-2xl rounded-tr-sm bg-primary px-3.5 py-2.5 text-sm text-primary-foreground shadow-[var(--shadow-card)]" : "rounded-2xl rounded-tl-sm bg-card px-3.5 py-2.5 text-sm text-card-foreground shadow-[var(--shadow-card)]"}>{m.text}</div><div className={`mt-1 text-[10px] text-muted-foreground ${m.from === "me" ? "text-right" : ""}`}>{m.time}</div></div></div>)}
       {account?.paid && myMessageCount > 0 && <div className="mx-auto max-w-md text-center text-[10px] text-muted-foreground">Ujumbe wako: {myMessageCount} / 10 • Kila ujumbe 10 unalipa TZS {user.money.toLocaleString()}</div>}
     </main>
-    <div className="sticky bottom-0 flex items-center gap-2 border-t border-border bg-card px-3 py-2.5"><input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Andika ujumbe..." className="flex-1 rounded-full border border-border bg-secondary px-4 py-2.5 text-sm text-foreground outline-none" /><button onClick={send} className="rounded-full bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">Tuma</button></div>
+    <div className="sticky bottom-0 flex items-center gap-2 border-t border-border bg-card px-3 py-2.5"><input disabled={chatClosed} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder={chatClosed ? "Chat imefungwa — ujumbe 10 umekamilika" : "Andika ujumbe..."} className="flex-1 rounded-full border border-border bg-secondary px-4 py-2.5 text-sm text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-60" /><button disabled={chatClosed} onClick={() => void send()} className="rounded-full bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">Tuma</button></div>
 
+    <Modal open={chatClosed} onClose={() => undefined} icon="🎉" title="Umefanikiwa kulipwa!">
+      <div className="rounded-2xl bg-emerald-50 p-4">
+        <div className="text-xs font-semibold text-emerald-700">MALIPO YA CHAT</div>
+        <div className="mt-1 text-3xl font-black text-emerald-700">TZS {earnedAmount.toLocaleString()}</div>
+        <p className="mt-1 text-xs text-emerald-700">Ujumbe 10 umekamilika. Chat hii imefungwa.</p>
+      </div>
+      <button onClick={() => navigate({ to: "/dashboard" })} className="mt-3 w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground">Rudi Dashboard</button>
+    </Modal>
     <Modal open={locked} onClose={() => setLocked(false)} icon="🔒" title="Jisajili au Login ili Kuendelea"><p>Umetuma ujumbe mmoja wa kuanzia. Ili kutuma ujumbe mwingine, unatakiwa <strong>kujisajili au kuingia kwenye akaunti</strong>.</p><div className="space-y-2 pt-3"><button onClick={goRegister} className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">Jisajili SASA</button><button onClick={() => navigate({ to: "/login" })} className="w-full rounded-xl border border-border bg-secondary px-4 py-2.5 text-sm font-bold text-secondary-foreground">Login</button><BackButton onClick={() => setLocked(false)} label="Rudi kwenye Chat" /></div></Modal>
     <Modal open={paymentNeeded} onClose={() => setPaymentNeeded(false)} icon="💳" title="Kamilisha Malipo"><p>Akaunti yako imesajiliwa. Kamilisha malipo ili uendelee kutuma meseji na kupata malipo.</p><div className="space-y-2 pt-3"><button onClick={() => navigate({ to: "/payment" })} className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">Lipa SASA</button><BackButton onClick={() => setPaymentNeeded(false)} label="Rudi Kwenye Chat" /></div></Modal>
     <Modal open={withdraw} onClose={() => setWithdraw(false)} icon="👛" title="Withdrawal">

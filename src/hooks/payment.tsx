@@ -42,7 +42,7 @@ function PaymentPage() {
     setReady(true);
     void checkDreamVoraPayment({ data: { token } }).then((result) => {
       setPaymentId(result.paymentId ? String(result.paymentId) : null);
-      if (result.status === "APPROVED") { markPaid(); goAfterPayment(navigate); return; }
+      if (result.status === "APPROVED") { markPaid(PAYMENT_AMOUNT); goAfterPayment(navigate); return; }
       if (result.status === "PENDING_ADMIN") setStatus("pending");
       else if (result.status === "PUSH_SENT") setStatus("awaiting_confirmation");
       else if (result.status === "FAILED" || result.status === "REJECTED") setStatus("rejected");
@@ -57,7 +57,7 @@ function PaymentPage() {
       void checkDreamVoraPayment({ data: { token } }).then((result) => {
         setPaymentId(result.paymentId ? String(result.paymentId) : null);
         if (result.status === "APPROVED") {
-          markPaid();
+          markPaid(PAYMENT_AMOUNT);
           setStatus("approved");
           goAfterPayment(navigate);
         } else if (result.status === "REJECTED" || result.status === "FAILED") {
@@ -96,7 +96,7 @@ function PaymentPage() {
     setMessage(null); setStatus("pending");
     try {
       const result = await confirmDreamVoraPayment({ data: { token, paymentId, phoneUsed: phone } });
-      if (result.status === "APPROVED") { markPaid(); setStatus("approved"); goAfterPayment(navigate); return; }
+      if (result.status === "APPROVED") { markPaid(PAYMENT_AMOUNT); setStatus("approved"); goAfterPayment(navigate); return; }
       setStatus("pending");
       setMessage("Tumepokea taarifa yako. Admin ataangalia malipo na akithibitisha account itafunguka.");
     } catch (err) {

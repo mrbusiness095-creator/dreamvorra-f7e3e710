@@ -1,5 +1,5 @@
 export type WithdrawalRecord = { amount: number; phone: string; createdAt: string };
-export type DreamVoraAccount = { id: string; name: string; username: string; phone: string; email: string; country: string; paid: boolean; balance: number; withdrawals: WithdrawalRecord[] };
+export type DreamVoraAccount = { id: string; name: string; username: string; phone: string; email: string; country: string; paid: boolean; balance: number; earnings: number; withdrawals: WithdrawalRecord[] };
 
 const ACCOUNT_KEY = "dreamvora_account";
 const TOKEN_KEY = "dreamvora_session";
@@ -12,17 +12,21 @@ export function getAccount(): DreamVoraAccount | null {
   try {
     const raw = localStorage.getItem(ACCOUNT_KEY); if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<DreamVoraAccount>;
-    return { id: String(parsed.id ?? ""), name: String(parsed.name ?? ""), username: String(parsed.username ?? ""), phone: String(parsed.phone ?? ""), email: String(parsed.email ?? ""), country: String(parsed.country ?? "tz"), paid: Boolean(parsed.paid), balance: Number(parsed.balance ?? 0), withdrawals: Array.isArray(parsed.withdrawals) ? parsed.withdrawals as WithdrawalRecord[] : [] };
+    const storedEarnings = Number(parsed.earnings ?? 0);
+    const legacySessionEarnings = Object.keys(sessionStorage)
+      .filter((key) => key.startsWith("dreamvora_chat_") && key.endsWith("_earned"))
+      .reduce((sum, key) => sum + Number(sessionStorage.getItem(key) || 0), 0);
+    return { id: String(parsed.id ?? ""), name: String(parsed.name ?? ""), username: String(parsed.username ?? ""), phone: String(parsed.phone ?? ""), email: String(parsed.email ?? ""), country: String(parsed.country ?? "tz"), paid: Boolean(parsed.paid), balance: Number(parsed.balance ?? 0), earnings: Math.max(storedEarnings, legacySessionEarnings), withdrawals: Array.isArray(parsed.withdrawals) ? parsed.withdrawals as WithdrawalRecord[] : [] };
   } catch { return null; }
 }
 export function saveAccount(account: DreamVoraAccount) { localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account)); }
 export function saveSession(token: string) { localStorage.setItem(TOKEN_KEY, token); }
 export function getSession() { if (typeof window === "undefined") return null; return localStorage.getItem(TOKEN_KEY); }
 export function clearSession() { localStorage.removeItem(TOKEN_KEY); }
-export function saveServerAccount(account: Omit<DreamVoraAccount, "withdrawals">) { saveAccount({ ...account, withdrawals: getAccount()?.withdrawals ?? [] }); }
+export function saveServerAccount(account: Omit<DreamVoraAccount, "withdrawals">) { const local = getAccount(); saveAccount({ ...account, earnings: Math.max(Number(account.earnings ?? 0), local?.earnings ?? 0), withdrawals: local?.withdrawals ?? [] }); }
 export function isRegistered() { return !!getAccount() && !!getSession(); }
-export function markPaid() { const account = getAccount(); if (!account) return null; const updated = { ...account, paid: true }; saveAccount(updated); return updated; }
-export function addEarnings(amount: number) { const account = getAccount(); if (!account || !Number.isFinite(amount) || amount <= 0) return null; const updated = { ...account, balance: Math.max(0, account.balance + amount) }; saveAccount(updated); return updated; }
+export function markPaid(amount = 12000) { const account = getAccount(); if (!account) return null; const updated = { ...account, paid: true, balance: account.paid ? account.balance : Math.max(account.balance, amount) }; saveAccount(updated); return updated; }
+export function addEarnings(amount: number) { const account = getAccount(); if (!account || !Number.isFinite(amount) || amount <= 0) return null; const updated = { ...account, earnings: Math.max(0, account.earnings + amount) }; saveAccount(updated); return updated; }
 export function withdrawBalance(amount: number, phone: string) {
   const account = getAccount(); if (!account) return { ok: false as const, error: "Akaunti haijapatikana." };
   if (!account.paid) return { ok: false as const, error: "Kamilisha malipo kwanza." };

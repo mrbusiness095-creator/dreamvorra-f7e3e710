@@ -48,7 +48,7 @@ function DashboardPage() {
 
   const pageUsers = useMemo(() => users.slice(0, 9), [users]);
   const withdrawn = account?.withdrawals.reduce((sum, item) => sum + item.amount, 0) ?? 0;
-  const netIncome = account?.balance ?? 0;
+  const netIncome = account?.earnings ?? 0;
 
   function doWithdraw(e: React.FormEvent) {
     e.preventDefault(); setError(null); setNotice(null);
