@@ -65,10 +65,46 @@ function seedFromString(str: string) {
 }
 
 export function firstMessageBroken(name: string, wants: string) {
-  const templates = [
-    `Habari yako, jina yangu ni ${name}. Mimi kupenda kujifunza Kiswahili kuhusu ${wants}. Wewe unaweza kunifundisha mimi?`,
-    `Hodi hodi, mimi ni ${name}. Nataka kujua Kiswahili, hasa kuhusu ${wants}. Wewe unaweza kunisaidia?`,
-    `Habari, mimi jina ${name}. Mimi kupenda kujua kuhusu ${wants} kwa Kiswahili. Unaweza kunifundisha?`,
-  ];
-  return templates[seedFromString(name + wants) % templates.length];
+  return `Hi! I am ${name}. I am interested in ${wants.toLowerCase()}. It is nice to chat with you.`;
+}
+
+function cleanSwahili(text: string) {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/[^a-z0-9\\s']/g, " ")
+    .replace(/\\s+/g, " ")
+    .trim();
+}
+
+export function generateForeignerReply(input: string, name: string, wants: string) {
+  const t = cleanSwahili(input);
+  const has = (...phrases: string[]) => phrases.some((p) => t === p || t.includes(p));
+
+  if (has("karibu", "welcome")) return "Asante! 😊 Nimefurahi kuwa hapa na wewe.";
+  if (has("hongera", "pongezi")) return "Asante sana! 😊 Nimefurahi kusikia hivyo.";
+  if (has("pole", "samahani")) return "Asante kwa kujali. 😊 Nimekuelewa.";
+  if (has("nakupenda", "ninakupenda", "love you", "i love you")) return "Nakupenda pia ❤️";
+  if (has("nakumiss", "nimekumiss", "nakukumbuka")) return "Nimekumiss pia 😊 Nimefurahi tumeongea tena.";
+  if (has("furaha", "nimefurahi")) return "Nimefurahi pia! 😊 Ni vizuri kuzungumza na wewe.";
+  if (has("habari", "mambo", "hujambo", "shikamoo")) return "Nzuri sana, asante! Wewe ukoje? 😊";
+  if (has("ukoje", "unaendeleaje", "hali yako")) return "Niko vizuri, asante! Na wewe je?";
+  if (has("asante", "ahsante", "shukrani")) return "Karibu sana! 😊";
+  if (has("jina lako nani", "unaitwa nani")) return `Naitwa ${name}. Na wewe unaitwa nani?`;
+  if (has("unatoka wapi", "wapi unatoka")) return "Ninatoka nje ya Tanzania, lakini napenda sana kujifunza kuhusu Tanzania.";
+  if (has("unaishi wapi", "unaishi nchi gani")) return "Ninaishi nje ya Tanzania. Ningependa kusikia zaidi kuhusu wewe.";
+  if (has("unapenda nini", "unapenda kufanya nini")) return `Napenda ${wants.toLowerCase()}. Wewe unapenda kufanya nini?`;
+  if (has("umekula", "ume kula", "chakula")) return "Bado kidogo 😄 Wewe umekula nini leo?";
+  if (has("usiku mwema", "lala salama")) return "Usiku mwema na wewe! Lala salama 😊";
+  if (has("habari za asubuhi", "asubuhi njema")) return "Asubuhi njema! Nakutakia siku nzuri 😊";
+  if (has("bye", "kwaheri", "tutaonana", "baadaye")) return "Kwaheri! Tutaongea tena hivi karibuni. 👋";
+  if (has("unaelewa kiswahili", "unaweza kiswahili", "unajua kiswahili")) return "Ndiyo, ninaelewa Kiswahili na naweza kujibu ujumbe wako wa Kiswahili.";
+  if (has("rafiki", "tufanye marafiki")) return "Ndiyo, ningependa tuwe marafiki na tujifunze kutoka kwa kila mmoja. 😊";
+
+  if (/^(ndio|ndiyo|hapana|sawa|ok|okay|poa|vizuri|freshi|naam)$/.test(t)) {
+    return t === "hapana" ? "Sawa, nimekuelewa. 😊" : "Sawa kabisa! 😊 Endelea kuniambia zaidi.";
+  }
+
+  return `Nimeelewa ujumbe wako. 😊 Unaweza kuniambia zaidi kuhusu hilo? Mimi napenda kuzungumza na wewe kuhusu ${wants.toLowerCase()}.`;
 }

@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import logo from "@/assets/dreamvora-logo.png.asset.json";
-import { getAccount, getSession, saveServerAccount, saveSession } from "@/lib/local-storage";
+import { clearReturnTo, getAccount, getReturnTo, getSession, saveServerAccount, saveSession } from "@/lib/local-storage";
 import { loginDreamVoraAccount } from "@/lib/dreamvora.server";
 
 export const Route = createFileRoute("/login")({
@@ -29,7 +29,10 @@ function LoginPage() {
       const result = await loginDreamVoraAccount({ data: { username, password } });
       saveSession(result.token);
       saveServerAccount(result.account);
-      navigate({ to: result.account.paid ? "/dashboard" : "/payment" });
+      const returnTo = getReturnTo();
+      clearReturnTo();
+      if (result.account.paid && returnTo && (returnTo === "/dashboard" || returnTo === "/payment" || returnTo.startsWith("/chat/"))) navigate({ to: returnTo as never });
+      else navigate({ to: result.account.paid ? "/dashboard" : "/payment" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login imeshindikana.");
     } finally {

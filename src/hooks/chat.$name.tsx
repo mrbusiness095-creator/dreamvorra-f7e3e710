@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { BackButton, Flag, Header, Modal } from "@/components/dv";
-import { findUser, firstMessageBroken } from "@/data/users";
+import { findUser, firstMessageBroken, generateForeignerReply } from "@/data/users";
 import { addEarnings, getAccount, getSession, saveServerAccount, setPendingChat, withdrawBalance, type DreamVoraAccount } from "@/lib/local-storage";
 import { getDreamVoraAccount } from "@/lib/dreamvora.server";
 
@@ -80,9 +80,9 @@ function ChatPage() {
     if (nextCount % 10 === 0) {
       const updated = addEarnings(user.money);
       if (updated) setAccount(updated);
-      setTimeout(() => setMessages((prev) => [...prev, { id: `reply-${Date.now()}`, from: "foreigner", text: "Asante! Tumezungumza ujumbe 10. Endelea na mazungumzo yetu 😊", time: nowTime() }]), 500);
+      setTimeout(() => setMessages((prev) => [...prev, { id: `reply-${Date.now()}`, from: "foreigner", text: generateForeignerReply(nextMessage.text, user.name, user.wants), time: nowTime() }]), 500);
     } else {
-      setTimeout(() => setMessages((prev) => [...prev, { id: `reply-${Date.now()}`, from: "foreigner", text: `Nimekupata 😊 Tuendelee kuzungumza kuhusu ${user.wants}.`, time: nowTime() }]), 500);
+      setTimeout(() => setMessages((prev) => [...prev, { id: `reply-${Date.now()}`, from: "foreigner", text: generateForeignerReply(nextMessage.text, user.name, user.wants), time: nowTime() }]), 500);
     }
   }
 

@@ -4,6 +4,8 @@ export type DreamVoraAccount = { id: string; name: string; username: string; pho
 const ACCOUNT_KEY = "dreamvora_account";
 const TOKEN_KEY = "dreamvora_session";
 export const PENDING_CHAT_KEY = "dreamvora_pending_chat";
+export const RETURN_TO_KEY = "dreamvora_return_to";
+export const HIDDEN_AT_KEY = "dreamvora_hidden_at";
 
 export function getAccount(): DreamVoraAccount | null {
   if (typeof window === "undefined") return null;
@@ -34,3 +36,11 @@ export function setPendingChat(name: string) { localStorage.setItem(PENDING_CHAT
 export function getPendingChat() { if (typeof window === "undefined") return null; return localStorage.getItem(PENDING_CHAT_KEY); }
 export function clearPendingChat() { localStorage.removeItem(PENDING_CHAT_KEY); }
 export function logout() { localStorage.removeItem(ACCOUNT_KEY); clearSession(); localStorage.removeItem(PENDING_CHAT_KEY); }
+
+
+export function setReturnTo(path: string) { if (typeof window !== "undefined") localStorage.setItem(RETURN_TO_KEY, path); }
+export function getReturnTo() { if (typeof window === "undefined") return null; return localStorage.getItem(RETURN_TO_KEY); }
+export function clearReturnTo() { if (typeof window !== "undefined") localStorage.removeItem(RETURN_TO_KEY); }
+export function setHiddenAt(value: number) { if (typeof window !== "undefined") localStorage.setItem(HIDDEN_AT_KEY, String(value)); }
+export function getHiddenAt() { if (typeof window === "undefined") return null; const value = Number(localStorage.getItem(HIDDEN_AT_KEY)); return Number.isFinite(value) && value > 0 ? value : null; }
+export function clearHiddenAt() { if (typeof window !== "undefined") localStorage.removeItem(HIDDEN_AT_KEY); }

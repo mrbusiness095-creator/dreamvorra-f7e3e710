@@ -68,7 +68,7 @@ function verifyPassword(password: string, stored: string) {
 
 function tokenFor(subject: string, kind: "user" | "admin") {
   const secret = requireSecret();
-  const payload = `${kind}:${subject}:${Date.now() + 7 * 24 * 60 * 60 * 1000}`;
+  const payload = `${kind}:${subject}:${Date.now() + 5 * 60 * 1000}`;
   const body = Buffer.from(payload).toString("base64url");
   const sig = createHmac("sha256", secret).update(body).digest("base64url");
   return `${body}.${sig}`;
@@ -145,7 +145,7 @@ export const getDreamVoraAccount = createServerFn({ method: "POST" })
   .inputValidator((input: { token: string }) => input)
   .handler(async ({ data }) => {
     const sql = db();
-    try { await ensureSchema(sql); const user = await getUserByToken(sql, data.token); return { account: { ...user, id: String(user.id), balance: Number(user.balance), paid: Boolean(user.paid) } }; }
+    try { await ensureSchema(sql); const user = await getUserByToken(sql, data.token); return { token: tokenFor(String(user.id), "user"), account: { ...user, id: String(user.id), balance: Number(user.balance), paid: Boolean(user.paid) } }; }
     finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
   });
 
@@ -177,6 +177,37 @@ export const checkDreamVoraPayment = createServerFn({ method: "POST" })
       const payment = rows[0];
       return { status: Boolean(user.paid) ? "APPROVED" : String(payment?.status ?? "NONE"), paymentId: payment?.id ?? null, message: Boolean(user.paid) ? "Malipo yameidhinishwa." : "Bado tunasubiri uthibitisho." };
     } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
+  });
+
+
+
+export const getPublicDreamVoraPayments = createServerFn({ method: "POST" })
+  .inputValidator((input: { limit?: number }) => input)
+  .handler(async ({ data }) => {
+    const sql = db();
+    try {
+      await ensureSchema(sql);
+      const limit = Math.min(Math.max(Number(data.limit ?? 20), 1), 50);
+      const rows = await sql`
+        SELECT p.id, p.amount, p.approved_at, u.name, u.country
+        FROM dreamvora_payments p
+        JOIN dreamvora_users u ON u.id = p.user_id
+        WHERE p.status = 'APPROVED' AND p.approved_at IS NOT NULL
+        ORDER BY p.approved_at DESC
+        LIMIT ${limit}
+      `;
+      return {
+        payments: rows.map((r) => ({
+          id: String(r.id),
+          name: String(r.name).split(/\s+/)[0],
+          country: String(r.country || "TZ").toUpperCase(),
+          amount: Number(r.amount),
+          approvedAt: String(r.approved_at),
+        })),
+      };
+    } finally {
+      await sql.end({ timeout: 1 }).catch(() => undefined);
+    }
   });
 
 export const adminLoginDreamVora = createServerFn({ method: "POST" })
