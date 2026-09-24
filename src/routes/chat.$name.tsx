@@ -110,7 +110,7 @@ function ChatPage() {
     setRewardError(null);
     try {
       const chatKey = `${localAccount.id}:${storageKey}:completed`;
-      const result = await recordDreamVoraChatEarning({ data: { token, chatKey, amount: user.money } });
+      const result = await recordDreamVoraChatEarning({ data: { token, chatKey, amount: user.money, personName: user.name, messageCount: myMessageCount } });
       const updated = { ...localAccount, earnings: Number(result.earnings), balance: Number(result.balance), paid: true };
       saveAccount(updated);
       setAccount(updated);

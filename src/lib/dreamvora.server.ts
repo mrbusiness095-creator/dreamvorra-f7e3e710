@@ -48,6 +48,21 @@ async function ensureSchema(sql: ReturnType<typeof postgres>) {
     )
   `;
   await sql`CREATE INDEX IF NOT EXISTS dreamvora_chat_earnings_user_idx ON dreamvora_chat_earnings(user_id, created_at DESC)`;
+  // Use a dedicated reward ledger for completed chats. This intentionally does
+  // not depend on the legacy dreamvora_chat_earnings table, which may exist
+  // in older deployments with a different schema or database trigger.
+  await sql`
+    CREATE TABLE IF NOT EXISTS dreamvora_chat_rewards (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES dreamvora_users(id) ON DELETE CASCADE,
+      chat_key TEXT NOT NULL UNIQUE,
+      person_name TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      message_count INTEGER NOT NULL DEFAULT 10,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS dreamvora_chat_rewards_user_idx ON dreamvora_chat_rewards(user_id, created_at DESC)`;
   await sql`
     CREATE TABLE IF NOT EXISTS dreamvora_payments (
       id TEXT PRIMARY KEY,
@@ -62,6 +77,8 @@ async function ensureSchema(sql: ReturnType<typeof postgres>) {
       transid TEXT
     )
   `;
+  await sql`ALTER TABLE dreamvora_payments ADD COLUMN IF NOT EXISTS balance_credited BOOLEAN NOT NULL DEFAULT FALSE`;
+  await sql`UPDATE dreamvora_payments p SET balance_credited = TRUE FROM dreamvora_users u WHERE p.user_id = u.id AND p.status = 'APPROVED' AND u.paid = TRUE AND p.balance_credited = FALSE`;
   await sql`CREATE INDEX IF NOT EXISTS dreamvora_payments_status_idx ON dreamvora_payments(status)`;
   await sql`CREATE INDEX IF NOT EXISTS dreamvora_payments_user_idx ON dreamvora_payments(user_id, submitted_at DESC)`;
   await sql`
@@ -197,7 +214,7 @@ export const getDreamVoraAccount = createServerFn({ method: "POST" })
   });
 
 export const recordDreamVoraChatEarning = createServerFn({ method: "POST" })
-  .inputValidator((input: { token: string; chatKey: string; amount: number }) => input)
+  .inputValidator((input: { token: string; chatKey: string; amount: number; personName?: string; messageCount?: number }) => input)
   .handler(async ({ data }) => {
     const sql = db();
     try {
@@ -205,22 +222,54 @@ export const recordDreamVoraChatEarning = createServerFn({ method: "POST" })
       const user = await getUserByToken(sql, data.token);
       const amount = Math.floor(Number(data.amount));
       const chatKey = data.chatKey.trim();
+      const personName = String(data.personName ?? "Foreigner").trim().slice(0, 100) || "Foreigner";
+      const messageCount = Math.max(1, Math.min(100, Math.floor(Number(data.messageCount ?? 10))));
       if (!Boolean(user.paid)) throw new Error("Akaunti haijaidhinishwa.");
       if (!chatKey || !Number.isFinite(amount) || amount <= 0 || amount > 1000000) throw new Error("Malipo ya chat si sahihi.");
+      if (messageCount < 10) throw new Error("Chat haijakamilika.");
+
       const result = await sql.begin(async (tx) => {
+        // Insert the completion record first. The unique chat_key makes the
+        // operation idempotent even if the browser retries after a timeout.
         const inserted = await tx`
-          INSERT INTO dreamvora_chat_earnings (id, user_id, chat_key, amount)
-          VALUES (${randomUUID()}, ${user.id}, ${chatKey}, ${amount})
+          INSERT INTO dreamvora_chat_rewards (id, user_id, chat_key, person_name, amount, message_count)
+          VALUES (${randomUUID()}, ${user.id}, ${chatKey}, ${personName}, ${amount}, ${messageCount})
           ON CONFLICT (chat_key) DO NOTHING
           RETURNING id
         `;
+
         if (inserted[0]) {
-          await tx`UPDATE dreamvora_users SET earnings = earnings + ${amount}, balance = balance + ${amount} WHERE id = ${user.id}`;
+          await tx`
+            UPDATE dreamvora_users
+            SET earnings = COALESCE(earnings, 0) + ${amount},
+                balance = COALESCE(balance, 0) + ${amount}
+            WHERE id = ${user.id}
+          `;
         }
-        const rows = await tx`SELECT balance, earnings FROM dreamvora_users WHERE id = ${user.id} LIMIT 1`;
-        return { added: Boolean(inserted[0]), balance: Number(rows[0]?.balance ?? 0), earnings: Number(rows[0]?.earnings ?? 0) };
+
+        const rows = await tx`
+          SELECT balance, earnings
+          FROM dreamvora_users
+          WHERE id = ${user.id}
+          LIMIT 1
+        `;
+        if (!rows[0]) throw new Error("Akaunti haijapatikana baada ya malipo.");
+        return {
+          added: Boolean(inserted[0]),
+          rewardId: inserted[0] ? String(inserted[0].id) : null,
+          balance: Number(rows[0].balance ?? 0),
+          earnings: Number(rows[0].earnings ?? 0),
+        };
       });
-      return { added: result.added, amount, balance: result.balance, earnings: result.earnings };
+
+      return {
+        ok: true,
+        added: result.added,
+        rewardId: result.rewardId,
+        amount,
+        balance: result.balance,
+        earnings: result.earnings,
+      };
     } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
   });
 
@@ -372,8 +421,9 @@ export const adminListDreamVoraPayments = createServerFn({ method: "POST" })
     try {
       await ensureSchema(sql);
       const rows = await sql`
-        SELECT p.id, p.phone_used, p.amount, p.lipa_number, p.status, p.submitted_at, p.approved_at,
-               u.id AS user_id, u.name, u.username, u.phone AS account_phone, u.email
+        SELECT p.id, p.phone_used, p.amount, p.lipa_number, p.status, p.submitted_at, p.approved_at, p.balance_credited,
+               u.id AS user_id, u.name, u.username, u.phone AS account_phone, u.email,
+               u.paid AS account_paid, u.balance AS account_balance, u.earnings AS account_earnings
         FROM dreamvora_payments p JOIN dreamvora_users u ON u.id = p.user_id
         ORDER BY CASE WHEN p.status = 'PENDING' THEN 0 ELSE 1 END, p.submitted_at DESC LIMIT 200
       `;
@@ -388,49 +438,109 @@ export const adminSetDreamVoraPaymentStatus = createServerFn({ method: "POST" })
     const sql = db();
     try {
       await ensureSchema(sql);
-      const rows = await sql`SELECT user_id, status FROM dreamvora_payments WHERE id = ${data.paymentId} LIMIT 1`;
-      const payment = rows[0];
-      if (!payment) throw new Error("Malipo hayajapatikana.");
-      if (data.status === "APPROVED") {
-        const result = await sql.begin(async (tx) => {
-          // Approving a payment is the single source of truth for activation.
-          // Make the operation idempotent so repeated taps cannot credit balance twice.
-          const approved = await tx`
-            UPDATE dreamvora_payments
-            SET status = 'APPROVED', approved_at = COALESCE(approved_at, NOW()), rejected_at = NULL
-            WHERE id = ${data.paymentId}
-            RETURNING id, user_id, amount
-          `;
-          if (!approved[0]) throw new Error("Malipo hayajapatikana.");
 
+      if (data.status === "REJECTED") {
+        const rejected = await sql.begin(async (tx) => {
+          const rows = await tx`
+            SELECT id, user_id, status
+            FROM dreamvora_payments
+            WHERE id = ${data.paymentId}
+            FOR UPDATE
+          `;
+          const payment = rows[0];
+          if (!payment) throw new Error("Malipo hayajapatikana.");
+          if (String(payment.status) === "APPROVED") {
+            throw new Error("Malipo hayawezi ku-reject baada ya ku-approve.");
+          }
           await tx`
             UPDATE dreamvora_payments
             SET status = 'REJECTED', rejected_at = NOW()
-            WHERE user_id = ${payment.user_id}
-              AND id <> ${data.paymentId}
-              AND status = 'PENDING'
+            WHERE id = ${data.paymentId}
           `;
-
-          // Only the first approval adds the paid amount to the user's balance.
-          const activated = await tx`
-            UPDATE dreamvora_users
-            SET paid = TRUE, balance = CASE WHEN paid THEN balance ELSE balance + ${payment.amount} END
-            WHERE id = ${payment.user_id}
-            RETURNING id, name, username, phone, email, country, paid, balance, earnings
-          `;
-          if (!activated[0]) throw new Error("Akaunti ya user haijapatikana.");
-          return activated[0];
+          return payment;
         });
-        return {
-          ok: true,
-          activated: Boolean(result?.paid),
-          account: result ? { ...result, id: String(result.id), paid: Boolean(result.paid), balance: Number(result.balance), earnings: Number(result.earnings ?? 0) } : null,
-        };
-      } else {
-        await sql`UPDATE dreamvora_payments SET status = 'REJECTED', rejected_at = NOW() WHERE id = ${data.paymentId}`;
-        return { ok: true, activated: false, account: null };
+        return { ok: true, activated: false, status: "REJECTED", paymentId: data.paymentId, userId: String(rejected.user_id) };
       }
-    } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
+
+      // APPROVE is deliberately handled as a server-side, idempotent activation.
+      // The payment row is locked first; the account is then activated and the
+      // payment amount is credited exactly once using balance_credited.
+      const result = await sql.begin(async (tx) => {
+        const rows = await tx`
+          SELECT id, user_id, amount, status, balance_credited
+          FROM dreamvora_payments
+          WHERE id = ${data.paymentId}
+          FOR UPDATE
+        `;
+        const payment = rows[0];
+        if (!payment) throw new Error("Malipo hayajapatikana.");
+        if (String(payment.status) === "REJECTED") {
+          // Allow admin to correct a previous rejection by approving again.
+        }
+
+        const amount = Number(payment.amount);
+        if (!Number.isFinite(amount) || amount <= 0) throw new Error("Kiasi cha malipo si sahihi.");
+
+        const userRows = await tx`
+          SELECT id, name, username, phone, email, country, paid, balance, earnings
+          FROM dreamvora_users
+          WHERE id = ${payment.user_id}
+          FOR UPDATE
+        `;
+        const user = userRows[0];
+        if (!user) throw new Error("Akaunti ya user haijapatikana.");
+
+        const alreadyCredited = Boolean(payment.balance_credited);
+        const nextBalance = Number(user.balance) + (alreadyCredited ? 0 : amount);
+
+        const activated = await tx`
+          UPDATE dreamvora_users
+          SET paid = TRUE,
+              balance = ${nextBalance}
+          WHERE id = ${payment.user_id}
+          RETURNING id, name, username, phone, email, country, paid, balance, earnings
+        `;
+        if (!activated[0] || !Boolean(activated[0].paid)) {
+          throw new Error("Activation ya account imeshindikana.");
+        }
+
+        await tx`
+          UPDATE dreamvora_payments
+          SET status = 'APPROVED',
+              approved_at = COALESCE(approved_at, NOW()),
+              rejected_at = NULL,
+              balance_credited = TRUE
+          WHERE id = ${data.paymentId}
+        `;
+
+        // Any other pending payment for the same user is no longer actionable.
+        await tx`
+          UPDATE dreamvora_payments
+          SET status = 'REJECTED', rejected_at = COALESCE(rejected_at, NOW())
+          WHERE user_id = ${payment.user_id}
+            AND id <> ${data.paymentId}
+            AND status = 'PENDING'
+        `;
+
+        return activated[0];
+      });
+
+      return {
+        ok: true,
+        activated: true,
+        status: "APPROVED",
+        paymentId: data.paymentId,
+        account: {
+          ...result,
+          id: String(result.id),
+          paid: Boolean(result.paid),
+          balance: Number(result.balance),
+          earnings: Number(result.earnings ?? 0),
+        },
+      };
+    } finally {
+      await sql.end({ timeout: 1 }).catch(() => undefined);
+    }
   });
 
 export { LIPA_NUMBER };

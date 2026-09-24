@@ -13,3 +13,7 @@ Chat rewards now follow a server-authoritative flow:
 9. If the server cannot confirm the reward, the chat is not falsely marked as paid; the user gets a retry action.
 
 The chat reward key is user-scoped so two different users chatting with the same foreigner do not collide.
+
+
+## 2026-09-24 database compatibility fix
+The reward ledger now uses `dreamvora_chat_rewards` instead of the legacy `dreamvora_chat_earnings` table. This avoids schema/trigger conflicts on deployments where the legacy table was created by an older build. Reward completion is transactional and updates both `earnings` and `balance` from the server.
