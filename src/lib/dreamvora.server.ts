@@ -7,8 +7,17 @@ const LIPA_NUMBER = "354136248";
 const AUTH_SECRET = process.env.DREAMVORA_AUTH_SECRET;
 
 function db() {
-  const url = process.env.NETLIFY_DB_URL;
-  if (!url) throw new Error("NETLIFY_DB_URL haijawekwa. Tengeneza Netlify Database na ongeza environment variable hiyo.");
+  // Netlify Database exposes NETLIFY_DB_URL. Keep compatibility with older
+  // deployments that used NETLIFY_DATABASE_URL or a generic DATABASE_URL.
+  const url =
+    process.env.NETLIFY_DB_URL ||
+    process.env.NETLIFY_DATABASE_URL ||
+    process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error(
+      "Database haijaunganishwa. Weka NETLIFY_DB_URL kwenye Netlify Environment Variables kisha redeploy site."
+    );
+  }
   return postgres(url, { max: 1, prepare: false });
 }
 
@@ -78,10 +87,16 @@ async function ensureSchema(sql: ReturnType<typeof postgres>) {
 }
 
 function requireSecret() {
-  if (!AUTH_SECRET || AUTH_SECRET.length < 32) {
-    throw new Error("DREAMVORA_AUTH_SECRET lazima iwe na angalau herufi 32.");
+  if (AUTH_SECRET && AUTH_SECRET.length >= 32) return AUTH_SECRET;
+  // Backward-compatible fallback for deployments that already have the admin
+  // password configured but lost the separate auth-secret variable.
+  const adminPassword = process.env.DREAMVORA_ADMIN_PASSWORD;
+  if (adminPassword && adminPassword.length >= 8) {
+    return createHmac("sha256", adminPassword).update("dreamvora-auth-v1").digest("hex");
   }
-  return AUTH_SECRET;
+  throw new Error(
+    "Authentication configuration haijakamilika. Weka DREAMVORA_AUTH_SECRET (angalau herufi 32) kwenye Netlify Environment Variables."
+  );
 }
 
 function hashPassword(password: string) {

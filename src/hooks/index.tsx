@@ -27,7 +27,7 @@ export const Route = createFileRoute("/")({
         property: "og:description",
         content: "Visit the official DreamVora Site to connect with foreigners, share your culture, learn languages, and explore online earning opportunities.",
       },
-      { property: "og:image", content: `${SITE_URL}/assets/images/dreamvora-logo.png` },
+      { property: "og:image", content: `${SITE_URL}/dreamvora-logo.svg` },
       { property: "og:type", content: "website" },
       { property: "og:locale", content: "en_TZ" },
       { property: "og:site_name", content: "DreamVora" },
@@ -38,7 +38,7 @@ export const Route = createFileRoute("/")({
         name: "twitter:description",
         content: "Visit the official DreamVora Site to connect with foreigners, share your culture, learn languages, and explore online earning opportunities.",
       },
-      { name: "twitter:image", content: `${SITE_URL}/assets/images/dreamvora-logo.png` },
+      { name: "twitter:image", content: `${SITE_URL}/dreamvora-logo.svg` },
       { name: "theme-color", content: "#0d1b3e" },
     ],
     links: [{ rel: "canonical", href: `${SITE_URL}/` }],
@@ -63,7 +63,7 @@ export const Route = createFileRoute("/")({
           name: "DreamVora",
           alternateName: ["DreamVora Site", "Dream Vora", "DreamVora official website"],
           url: `${SITE_URL}/`,
-          logo: `${SITE_URL}/assets/images/dreamvora-logo.png`,
+          logo: `${SITE_URL}/dreamvora-logo.svg`,
         }),
       },
     ],
@@ -91,7 +91,7 @@ function HomeHeader({
   return (
     <header className="dv-home-header">
       <a href="/" className="dv-home-logo-link" aria-label="DreamVora Home">
-        <img src="/assets/images/dreamvora-logo.png" alt="DreamVora Logo" className="dv-home-logo" />
+        <img src="/dreamvora-logo.svg" alt="DreamVora Logo" className="dv-home-logo" />
       </a>
 
       <div className="dv-home-online">
@@ -122,7 +122,7 @@ function HomeFooter({
       <div className="dv-home-footer-content">
         <div>
           <img
-            src="/assets/images/dreamvora-logo-white.png"
+            src="/dreamvora-logo-white.svg"
             alt="DreamVora"
             className="dv-home-footer-logo"
           />
