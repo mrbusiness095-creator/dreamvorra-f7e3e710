@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router"
 import { useEffect, useMemo, useState } from "react";
 import { BackButton, Flag, Header, Modal } from "@/components/dv";
 import { findUser, firstMessageBroken, generateForeignerReply } from "@/data/users";
-import { addEarnings, getAccount, getSession, saveServerAccount, setPendingChat, withdrawBalance, type DreamVoraAccount } from "@/lib/local-storage";
+import { getAccount, getSession, saveAccount, saveServerAccount, setPendingChat, withdrawBalance, type DreamVoraAccount } from "@/lib/local-storage";
 import { getDreamVoraAccount, recordDreamVoraChatEarning } from "@/lib/dreamvora.server";
 
 export const Route = createFileRoute("/chat/$name")({
@@ -46,6 +46,7 @@ function ChatPage() {
   const [withdrawNotice, setWithdrawNotice] = useState<string | null>(null);
   const [chatClosed, setChatClosed] = useState(false);
   const [earnedAmount, setEarnedAmount] = useState(0);
+  const [rewardError, setRewardError] = useState<string | null>(null);
   const [typing, setTyping] = useState(false);
   const myMessageCount = useMemo(() => messages.filter((m) => m.from === "me").length, [messages]);
 
@@ -67,8 +68,10 @@ function ChatPage() {
         setMessages(restored);
         const completedAmount = Number(sessionStorage.getItem(`${storageKey}_earned`) || 0);
         if (restored.filter((m) => m.from === "me").length >= 10) {
-          setChatClosed(true);
-          setEarnedAmount(completedAmount || user?.money || 0);
+          setEarnedAmount(completedAmount || 0);
+          // Re-submit the same server-side reward key. The server uses a unique
+          // key, so this is safe and also recovers a reward after refresh.
+          void claimReward();
         }
         return;
       }
@@ -97,8 +100,31 @@ function ChatPage() {
     }, delay);
   }
 
+  async function claimReward() {
+    const token = getSession();
+    const localAccount = getAccount();
+    if (!token || !localAccount?.id) {
+      setRewardError("Session ya account haipo. Ingia tena kisha ujaribu.");
+      return;
+    }
+    setRewardError(null);
+    try {
+      const chatKey = `${localAccount.id}:${storageKey}:completed`;
+      const result = await recordDreamVoraChatEarning({ data: { token, chatKey, amount: user.money } });
+      const updated = { ...localAccount, earnings: Number(result.earnings), balance: Number(result.balance), paid: true };
+      saveAccount(updated);
+      setAccount(updated);
+      setEarnedAmount(Number(result.amount));
+      sessionStorage.setItem(`${storageKey}_earned`, String(result.amount));
+      setChatClosed(true);
+    } catch (error) {
+      console.error("Chat reward retry failed", error);
+      setRewardError("Malipo hayajahifadhiwa bado. Jaribu tena.");
+    }
+  }
+
   async function send() {
-    if (!text.trim() || chatClosed || typing) return;
+    if (!text.trim() || chatClosed || typing || myMessageCount >= 10) return;
     const current = getAccount();
     const nextMessage: Message = { id: `me-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, from: "me", text: text.trim(), time: nowTime() };
 
@@ -121,32 +147,7 @@ function ChatPage() {
     scheduleForeignerReply(nextMessage);
 
     if (nextCount === 10) {
-      const chatKey = `${storageKey}:completed`;
-      try {
-        const token = getSession();
-        if (token) {
-          const result = await recordDreamVoraChatEarning({ data: { token, chatKey, amount: user.money } });
-          if (result.added) {
-            const local = getAccount();
-            if (local) {
-              const updated = { ...local, earnings: result.earnings, balance: result.balance };
-              localStorage.setItem("dreamvora_account", JSON.stringify(updated));
-              setAccount(updated);
-            }
-          }
-          setEarnedAmount(result.amount);
-        } else {
-          const updated = addEarnings(user.money);
-          if (updated) setAccount(updated);
-          setEarnedAmount(user.money);
-        }
-      } catch {
-        const updated = addEarnings(user.money);
-        if (updated) setAccount(updated);
-        setEarnedAmount(user.money);
-      }
-      sessionStorage.setItem(`${storageKey}_earned`, String(user.money));
-      setChatClosed(true);
+      await claimReward();
     }
   }
 
@@ -171,8 +172,9 @@ function ChatPage() {
       {messages.map((m) => <div key={m.id} className={m.from === "me" ? "flex justify-end" : "flex justify-start"}><div className="max-w-[82%]"><div className={m.from === "me" ? "rounded-2xl rounded-tr-sm bg-primary px-3.5 py-2.5 text-sm text-primary-foreground shadow-[var(--shadow-card)]" : "rounded-2xl rounded-tl-sm bg-card px-3.5 py-2.5 text-sm text-card-foreground shadow-[var(--shadow-card)]"}>{m.text}</div><div className={`mt-1 text-[10px] text-muted-foreground ${m.from === "me" ? "text-right" : ""}`}>{m.time}</div></div></div>)}
       {typing && <div className="flex justify-start"><div className="rounded-2xl rounded-tl-sm bg-card px-4 py-3 text-sm text-muted-foreground shadow-[var(--shadow-card)]"><span className="inline-flex items-center gap-1"><span className="animate-bounce">●</span><span className="animate-bounce [animation-delay:120ms]">●</span><span className="animate-bounce [animation-delay:240ms]">●</span></span> {user.name} anaandika...</div></div>}
       {account?.paid && myMessageCount > 0 && <div className="mx-auto max-w-md text-center text-[10px] text-muted-foreground">Ujumbe wako: {myMessageCount} / 10 • Kila ujumbe 10 unalipa TZS {user.money.toLocaleString()}</div>}
+      {rewardError && myMessageCount >= 10 && <div className="mx-auto max-w-md rounded-xl bg-red-50 p-3 text-center text-xs font-semibold text-red-700"><p>{rewardError}</p><button onClick={() => void claimReward()} className="mt-2 rounded-full bg-red-600 px-4 py-2 text-xs font-bold text-white">Jaribu tena</button></div>}
     </main>
-    <div className="sticky bottom-0 flex items-center gap-2 border-t border-border bg-card px-3 py-2.5"><input disabled={chatClosed || typing} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder={chatClosed ? "Chat imefungwa — ujumbe 10 umekamilika" : "Andika ujumbe..."} className="flex-1 rounded-full border border-border bg-secondary px-4 py-2.5 text-sm text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-60" /><button disabled={chatClosed || typing} onClick={() => void send()} className="rounded-full bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">Tuma</button></div>
+    <div className="sticky bottom-0 flex items-center gap-2 border-t border-border bg-card px-3 py-2.5"><input disabled={chatClosed || typing || myMessageCount >= 10} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder={chatClosed ? "Chat imefungwa — ujumbe 10 umekamilika" : "Andika ujumbe..."} className="flex-1 rounded-full border border-border bg-secondary px-4 py-2.5 text-sm text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-60" /><button disabled={chatClosed || typing || myMessageCount >= 10} onClick={() => void send()} className="rounded-full bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">Tuma</button></div>
 
     <Modal open={chatClosed} onClose={() => undefined} icon="🎉" title="Umefanikiwa kulipwa!">
       <div className="rounded-2xl bg-emerald-50 p-4">

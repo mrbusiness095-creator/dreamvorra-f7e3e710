@@ -207,17 +207,20 @@ export const recordDreamVoraChatEarning = createServerFn({ method: "POST" })
       const chatKey = data.chatKey.trim();
       if (!Boolean(user.paid)) throw new Error("Akaunti haijaidhinishwa.");
       if (!chatKey || !Number.isFinite(amount) || amount <= 0 || amount > 1000000) throw new Error("Malipo ya chat si sahihi.");
-      const inserted = await sql`
-        INSERT INTO dreamvora_chat_earnings (id, user_id, chat_key, amount)
-        VALUES (${randomUUID()}, ${user.id}, ${chatKey}, ${amount})
-        ON CONFLICT (chat_key) DO NOTHING
-        RETURNING id
-      `;
-      if (inserted[0]) {
-        await sql`UPDATE dreamvora_users SET earnings = earnings + ${amount}, balance = balance + ${amount} WHERE id = ${user.id}`;
-      }
-      const rows = await sql`SELECT balance, earnings FROM dreamvora_users WHERE id = ${user.id} LIMIT 1`;
-      return { added: Boolean(inserted[0]), amount, balance: Number(rows[0]?.balance ?? 0), earnings: Number(rows[0]?.earnings ?? 0) };
+      const result = await sql.begin(async (tx) => {
+        const inserted = await tx`
+          INSERT INTO dreamvora_chat_earnings (id, user_id, chat_key, amount)
+          VALUES (${randomUUID()}, ${user.id}, ${chatKey}, ${amount})
+          ON CONFLICT (chat_key) DO NOTHING
+          RETURNING id
+        `;
+        if (inserted[0]) {
+          await tx`UPDATE dreamvora_users SET earnings = earnings + ${amount}, balance = balance + ${amount} WHERE id = ${user.id}`;
+        }
+        const rows = await tx`SELECT balance, earnings FROM dreamvora_users WHERE id = ${user.id} LIMIT 1`;
+        return { added: Boolean(inserted[0]), balance: Number(rows[0]?.balance ?? 0), earnings: Number(rows[0]?.earnings ?? 0) };
+      });
+      return { added: result.added, amount, balance: result.balance, earnings: result.earnings };
     } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
   });
 
