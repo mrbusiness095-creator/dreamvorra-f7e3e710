@@ -214,7 +214,7 @@ export const recordDreamVoraChatEarning = createServerFn({ method: "POST" })
         RETURNING id
       `;
       if (inserted[0]) {
-        await sql`UPDATE dreamvora_users SET earnings = earnings + ${amount} WHERE id = ${user.id}`;
+        await sql`UPDATE dreamvora_users SET earnings = earnings + ${amount}, balance = balance + ${amount} WHERE id = ${user.id}`;
       }
       const rows = await sql`SELECT balance, earnings FROM dreamvora_users WHERE id = ${user.id} LIMIT 1`;
       return { added: Boolean(inserted[0]), amount, balance: Number(rows[0]?.balance ?? 0), earnings: Number(rows[0]?.earnings ?? 0) };

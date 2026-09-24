@@ -26,7 +26,7 @@ export function clearSession() { localStorage.removeItem(TOKEN_KEY); }
 export function saveServerAccount(account: Omit<DreamVoraAccount, "withdrawals">) { const local = getAccount(); saveAccount({ ...account, earnings: Math.max(Number(account.earnings ?? 0), local?.earnings ?? 0), withdrawals: local?.withdrawals ?? [] }); }
 export function isRegistered() { return !!getAccount() && !!getSession(); }
 export function markPaid(amount = 12000) { const account = getAccount(); if (!account) return null; const updated = { ...account, paid: true, balance: account.paid ? account.balance : Math.max(account.balance, amount) }; saveAccount(updated); return updated; }
-export function addEarnings(amount: number) { const account = getAccount(); if (!account || !Number.isFinite(amount) || amount <= 0) return null; const updated = { ...account, earnings: Math.max(0, account.earnings + amount) }; saveAccount(updated); return updated; }
+export function addEarnings(amount: number) { const account = getAccount(); if (!account || !Number.isFinite(amount) || amount <= 0) return null; const updated = { ...account, earnings: Math.max(0, account.earnings + amount), balance: Math.max(0, account.balance + amount) }; saveAccount(updated); return updated; }
 export function withdrawBalance(amount: number, phone: string) {
   const account = getAccount(); if (!account) return { ok: false as const, error: "Akaunti haijapatikana." };
   if (!account.paid) return { ok: false as const, error: "Kamilisha malipo kwanza." };
