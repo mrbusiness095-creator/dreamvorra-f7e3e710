@@ -12,7 +12,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { getDreamVoraAccount, getPublicDreamVoraPayments } from "../lib/dreamvora.server";
+import { getDreamVoraAccount } from "../lib/dreamvora.server";
 import { clearHiddenAt, clearReturnTo, clearSession, getHiddenAt, getSession, setHiddenAt, setReturnTo, saveSession, saveServerAccount } from "../lib/local-storage";
 
 function NotFoundComponent() {
@@ -137,63 +137,43 @@ function RootShell({ children }: { children: ReactNode }) {
 
 
 function PaidToastLoop() {
-  const [payments, setPayments] = useState<Array<{ id: string; name: string; country: string; amount: number; approvedAt: string }>>([]);
-  const [index, setIndex] = useState(0);
-  const [visible, setVisible] = useState(false);
+  const names = ["John", "Lameck", "Asha", "Neema", "Baraka", "Grace", "Daniel", "Rehema", "Kelvin", "Zawadi", "Brian", "Amina"];
+  const amounts = [50000, 68000, 75000, 85000, 100000, 120000];
+  const [toast, setToast] = useState<{ name: string; amount: number } | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const result = await getPublicDreamVoraPayments({ data: { limit: 20 } });
-        if (!cancelled) {
-          setPayments(result.payments);
-          setIndex((current) => result.payments.length ? current % result.payments.length : 0);
-        }
-      } catch { /* Public notifications are optional; never block the page. */ }
+    let active = true;
+    let hideTimer: number | undefined;
+    let showTimer: number | undefined;
+
+    const showNext = () => {
+      if (!active) return;
+      const name = names[Math.floor(Math.random() * names.length)];
+      const amount = amounts[Math.floor(Math.random() * amounts.length)];
+      setToast({ name, amount });
+      hideTimer = window.setTimeout(() => {
+        if (!active) return;
+        setToast(null);
+        showTimer = window.setTimeout(showNext, 10000);
+      }, 3000);
     };
-    void load();
-    const poll = window.setInterval(load, 60000);
-    return () => { cancelled = true; window.clearInterval(poll); };
+
+    showTimer = window.setTimeout(showNext, 2500);
+    return () => {
+      active = false;
+      if (hideTimer) window.clearTimeout(hideTimer);
+      if (showTimer) window.clearTimeout(showTimer);
+    };
   }, []);
 
-  useEffect(() => {
-    if (!payments.length) { setVisible(false); return; }
-    setVisible(true);
-    const timer = window.setInterval(() => {
-      setIndex((current) => (current + 1) % payments.length);
-      setVisible(true);
-      try {
-        const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-        if (AudioCtx) {
-          const ctx = new AudioCtx();
-          const oscillator = ctx.createOscillator();
-          const gain = ctx.createGain();
-          oscillator.frequency.value = 880;
-          gain.gain.value = 0.035;
-          oscillator.connect(gain);
-          gain.connect(ctx.destination);
-          oscillator.start();
-          oscillator.stop(ctx.currentTime + 0.12);
-        }
-      } catch { /* Browser autoplay policy may block notification audio. */ }
-    }, 10000);
-    return () => window.clearInterval(timer);
-  }, [payments.length]);
-
-  if (!visible || !payments.length) return null;
-  const payment = payments[index];
+  if (!toast) return null;
   return (
-    <div
-      className="fixed left-1/2 top-3 z-[200] w-[min(92vw,390px)] -translate-x-1/2 rounded-2xl border border-emerald-200 bg-white px-4 py-3 shadow-2xl"
-      role="status"
-      aria-live="polite"
-    >
+    <div className="fixed left-1/2 top-3 z-[200] w-[min(92vw,390px)] -translate-x-1/2 rounded-2xl border border-emerald-200 bg-white px-4 py-3 shadow-2xl" role="status" aria-live="polite">
       <div className="flex items-center gap-3">
         <div className="grid size-10 shrink-0 place-items-center rounded-full bg-emerald-100 text-xl">✓</div>
         <div className="min-w-0">
           <div className="text-xs font-extrabold text-emerald-700">MALIPO YAMEPOKELEWA ✓</div>
-          <div className="truncate text-sm font-bold text-slate-900">{payment.name} ({payment.country}) amelipwa TZS {payment.amount.toLocaleString()}</div>
+          <div className="truncate text-sm font-bold text-slate-900">{toast.name} (TZ) amelipwa TZS {toast.amount.toLocaleString()}</div>
           <div className="text-[10px] text-slate-500">DreamVora • malipo yaliyothibitishwa</div>
         </div>
       </div>

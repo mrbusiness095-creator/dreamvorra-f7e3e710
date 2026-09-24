@@ -193,6 +193,11 @@ function Index() {
 
   useEffect(() => {
     setShuffled([...usersDatabase].sort(() => Math.random() - 0.5));
+    const rotate = window.setInterval(() => {
+      setShuffled([...usersDatabase].sort(() => Math.random() - 0.5));
+      setPage(1);
+    }, 45000);
+    return () => window.clearInterval(rotate);
   }, []);
   const totalPages = Math.ceil(shuffled.length / USERS_PER_PAGE);
   const pageUsers = shuffled.slice((page - 1) * USERS_PER_PAGE, page * USERS_PER_PAGE);

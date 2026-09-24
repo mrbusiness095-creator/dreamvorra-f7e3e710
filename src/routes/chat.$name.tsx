@@ -71,19 +71,28 @@ function ChatPage() {
   function send() {
     if (!text.trim()) return;
     const current = getAccount();
-    if (!current) { setPendingChat(user.name); setLocked(true); return; }
+    const nextMessage: Message = { id: `me-${Date.now()}`, from: "me", text: text.trim(), time: nowTime() };
+
+    if (!current) {
+      const guestMessages = messages.filter((m) => m.from === "me").length;
+      if (guestMessages >= 1) { setPendingChat(user.name); setLocked(true); return; }
+      setMessages((prev) => [...prev, nextMessage]);
+      setText("");
+      window.setTimeout(() => setMessages((prev) => [...prev, { id: `reply-${Date.now()}`, from: "foreigner", text: generateForeignerReply(nextMessage.text, user.name, user.wants), time: nowTime() }]), 500);
+      setPendingChat(user.name);
+      window.setTimeout(() => setLocked(true), 250);
+      return;
+    }
+
     if (!current.paid) { setPendingChat(user.name); setPaymentNeeded(true); return; }
     const nextCount = messages.filter((m) => m.from === "me").length + 1;
-    const nextMessage: Message = { id: `me-${Date.now()}`, from: "me", text: text.trim(), time: nowTime() };
     setMessages((prev) => [...prev, nextMessage]);
     setText("");
     if (nextCount % 10 === 0) {
       const updated = addEarnings(user.money);
       if (updated) setAccount(updated);
-      setTimeout(() => setMessages((prev) => [...prev, { id: `reply-${Date.now()}`, from: "foreigner", text: generateForeignerReply(nextMessage.text, user.name, user.wants), time: nowTime() }]), 500);
-    } else {
-      setTimeout(() => setMessages((prev) => [...prev, { id: `reply-${Date.now()}`, from: "foreigner", text: generateForeignerReply(nextMessage.text, user.name, user.wants), time: nowTime() }]), 500);
     }
+    setTimeout(() => setMessages((prev) => [...prev, { id: `reply-${Date.now()}`, from: "foreigner", text: generateForeignerReply(nextMessage.text, user.name, user.wants), time: nowTime() }]), 500);
   }
 
   function doWithdraw(e: React.FormEvent) {
@@ -109,7 +118,7 @@ function ChatPage() {
     </main>
     <div className="sticky bottom-0 flex items-center gap-2 border-t border-border bg-card px-3 py-2.5"><input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Andika ujumbe..." className="flex-1 rounded-full border border-border bg-secondary px-4 py-2.5 text-sm text-foreground outline-none" /><button onClick={send} className="rounded-full bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">Tuma</button></div>
 
-    <Modal open={locked} onClose={() => setLocked(false)} icon="🔒" title="Jisajili ili Kuendelea"><p>Unaweza kuanza kuona mazungumzo na foreigner, lakini huwezi kutuma meseji hadi <strong>ujisajili</strong>.</p><div className="space-y-2 pt-3"><button onClick={goRegister} className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">Jisajili SASA</button><BackButton onClick={() => setLocked(false)} label="Rudi nyuma" /></div></Modal>
+    <Modal open={locked} onClose={() => setLocked(false)} icon="🔒" title="Jisajili au Login ili Kuendelea"><p>Umetuma ujumbe mmoja wa kuanzia. Ili kutuma ujumbe mwingine, unatakiwa <strong>kujisajili au kuingia kwenye akaunti</strong>.</p><div className="space-y-2 pt-3"><button onClick={goRegister} className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">Jisajili SASA</button><button onClick={() => navigate({ to: "/login" })} className="w-full rounded-xl border border-border bg-secondary px-4 py-2.5 text-sm font-bold text-secondary-foreground">Login</button><BackButton onClick={() => setLocked(false)} label="Rudi kwenye Chat" /></div></Modal>
     <Modal open={paymentNeeded} onClose={() => setPaymentNeeded(false)} icon="💳" title="Kamilisha Malipo"><p>Akaunti yako imesajiliwa. Kamilisha malipo ili uendelee kutuma meseji na kupata malipo.</p><div className="space-y-2 pt-3"><button onClick={() => navigate({ to: "/payment" })} className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">Lipa SASA</button><BackButton onClick={() => setPaymentNeeded(false)} label="Rudi Kwenye Chat" /></div></Modal>
     <Modal open={withdraw} onClose={() => setWithdraw(false)} icon="👛" title="Withdrawal">
       {!account ? <><p>Unatakiwa <strong>ujisajili</strong> kwanza ili uweze kupata fedha.</p><div className="space-y-2 pt-3"><button onClick={goRegister} className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">Jisajili SASA</button><BackButton onClick={() => setWithdraw(false)} label="Rudi Kwenye Chat" /></div></> : <form onSubmit={doWithdraw} className="space-y-3 text-left"><div className="rounded-xl bg-secondary p-3 text-center"><div className="text-[10px] font-semibold text-muted-foreground">CURRENT BALANCE</div><div className="text-xl font-extrabold text-primary">TZS {account.balance.toLocaleString()}</div></div><div><label className="mb-1 block text-xs font-bold">Amount</label><input required inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} placeholder="50000" className="k-field" /></div><div><label className="mb-1 block text-xs font-bold">Namba ya simu</label><input required inputMode="tel" value={withdrawPhone} onChange={(e) => setWithdrawPhone(e.target.value)} placeholder="06XXXXXXXX" className="k-field" /></div>{account.balance < 50000 && <p className="rounded-xl bg-k-red-50 p-3 text-xs font-semibold text-k-red-900">Minimum ya withdrawal ni TZS 50,000. Balance yako bado haijafikisha kiwango hicho.</p>}{withdrawError && <p className="text-xs font-semibold text-k-red-600">{withdrawError}</p>}{withdrawNotice && <p className="text-xs font-semibold text-k-green-700">{withdrawNotice}</p>}<button type="submit" disabled={account.balance < 50000} className="k-btn-green disabled:cursor-not-allowed disabled:opacity-50">Withdraw</button></form>}

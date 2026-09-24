@@ -58,7 +58,7 @@ function DashboardPage() {
     <div className="min-h-screen bg-k-slate-50 font-jost text-k-slate-800">
       <header className="sticky top-0 z-40 flex items-center justify-between gap-3 bg-k-green-900 px-4 py-4 text-white shadow-lg">
         <div>
-          <div className="text-lg font-extrabold tracking-tight">KOZENA <span className="text-k-amber-400">SITE</span></div>
+          <div className="text-lg font-extrabold tracking-tight">DREAMVORA</div>
           <div className="text-xs text-k-green-100">Karibu, {account.name}</div>
         </div>
         <button onClick={signOut} className="rounded-full bg-white/10 px-4 py-1.5 text-xs font-semibold">Toka</button>

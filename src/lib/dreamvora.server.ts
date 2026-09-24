@@ -43,6 +43,26 @@ async function ensureSchema(sql: ReturnType<typeof postgres>) {
   `;
   await sql`CREATE INDEX IF NOT EXISTS dreamvora_payments_status_idx ON dreamvora_payments(status)`;
   await sql`CREATE INDEX IF NOT EXISTS dreamvora_payments_user_idx ON dreamvora_payments(user_id, submitted_at DESC)`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS dreamvora_notifications (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS dreamvora_notification_reads (
+      id TEXT PRIMARY KEY,
+      notification_id TEXT NOT NULL REFERENCES dreamvora_notifications(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES dreamvora_users(id) ON DELETE CASCADE,
+      dismissed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(notification_id, user_id)
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS dreamvora_notifications_active_idx ON dreamvora_notifications(active, created_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS dreamvora_notification_reads_user_idx ON dreamvora_notification_reads(user_id, notification_id)`;
 }
 
 function requireSecret() {
@@ -149,6 +169,42 @@ export const getDreamVoraAccount = createServerFn({ method: "POST" })
     finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
   });
 
+export const getDreamVoraNotifications = createServerFn({ method: "POST" })
+  .inputValidator((input: { token: string }) => input)
+  .handler(async ({ data }) => {
+    const sql = db();
+    try {
+      await ensureSchema(sql);
+      const user = await getUserByToken(sql, data.token);
+      const rows = await sql`
+        SELECT n.id, n.title, n.message, n.created_at
+        FROM dreamvora_notifications n
+        LEFT JOIN dreamvora_notification_reads r
+          ON r.notification_id = n.id AND r.user_id = ${user.id}
+        WHERE n.active = TRUE AND r.id IS NULL
+        ORDER BY n.created_at DESC
+        LIMIT 10
+      `;
+      return { notifications: rows.map((r) => ({ id: String(r.id), title: String(r.title), message: String(r.message), createdAt: String(r.created_at) })) };
+    } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
+  });
+
+export const dismissDreamVoraNotification = createServerFn({ method: "POST" })
+  .inputValidator((input: { token: string; notificationId: string }) => input)
+  .handler(async ({ data }) => {
+    const sql = db();
+    try {
+      await ensureSchema(sql);
+      const user = await getUserByToken(sql, data.token);
+      await sql`
+        INSERT INTO dreamvora_notification_reads (id, notification_id, user_id)
+        VALUES (${randomUUID()}, ${data.notificationId}, ${user.id})
+        ON CONFLICT (notification_id, user_id) DO NOTHING
+      `;
+      return { ok: true };
+    } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
+  });
+
 export const submitDreamVoraPayment = createServerFn({ method: "POST" })
   .inputValidator((input: { token: string; phoneUsed: string }) => input)
   .handler(async ({ data }) => {
@@ -216,6 +272,41 @@ export const adminLoginDreamVora = createServerFn({ method: "POST" })
     const adminPassword = process.env.DREAMVORA_ADMIN_PASSWORD;
     if (!adminPassword || data.password !== adminPassword) throw new Error("Password ya admin si sahihi.");
     return { token: tokenFor("admin", "admin") };
+  });
+
+export const adminListDreamVoraNotifications = createServerFn({ method: "POST" })
+  .inputValidator((input: { token: string }) => input)
+  .handler(async ({ data }) => {
+    verifyToken(data.token, "admin");
+    const sql = db();
+    try {
+      await ensureSchema(sql);
+      const rows = await sql`
+        SELECT id, title, message, active, created_at
+        FROM dreamvora_notifications
+        ORDER BY created_at DESC
+        LIMIT 100
+      `;
+      return { notifications: rows.map((r) => ({ id: String(r.id), title: String(r.title), message: String(r.message), active: Boolean(r.active), createdAt: String(r.created_at) })) };
+    } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
+  });
+
+export const adminCreateDreamVoraNotification = createServerFn({ method: "POST" })
+  .inputValidator((input: { token: string; title: string; message: string }) => input)
+  .handler(async ({ data }) => {
+    verifyToken(data.token, "admin");
+    const title = data.title.trim();
+    const message = data.message.trim();
+    if (!title || !message) throw new Error("Weka kichwa na ujumbe wa notification.");
+    if (title.length > 100) throw new Error("Kichwa cha notification ni kirefu sana.");
+    if (message.length > 500) throw new Error("Ujumbe wa notification ni mrefu sana.");
+    const sql = db();
+    try {
+      await ensureSchema(sql);
+      const id = randomUUID();
+      await sql`INSERT INTO dreamvora_notifications (id, title, message) VALUES (${id}, ${title}, ${message})`;
+      return { ok: true, id };
+    } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
   });
 
 export const adminListDreamVoraPayments = createServerFn({ method: "POST" })
