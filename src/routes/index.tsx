@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Flag, Modal, RegisterButton, BackButton } from "@/components/dv";
 import { usersDatabase } from "@/data/users";
+import { getSession } from "@/lib/local-storage";
 
 const USERS_PER_PAGE = 9;
 const SITE_URL = "https://dreamvorra.site";
@@ -78,7 +79,17 @@ function HomeHeader({
   onWithdraw: () => void;
   onBalance: () => void;
 }) {
+  const navigate = useNavigate();
   const [online, setOnline] = useState(2535);
+  const [accountChoiceOpen, setAccountChoiceOpen] = useState(false);
+
+  function openDashboard() {
+    if (getSession()) {
+      navigate({ to: "/dashboard" });
+      return;
+    }
+    setAccountChoiceOpen(true);
+  }
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -100,6 +111,7 @@ function HomeHeader({
       </div>
 
       <div className="dv-home-header-right">
+        <button className="dv-home-withdraw" onClick={openDashboard}>📊 Dashboard</button>
         <button className="dv-home-withdraw" onClick={onWithdraw}>
           💰 Withdraw
         </button>
@@ -108,6 +120,21 @@ function HomeHeader({
           <span className="dv-home-wallet-amount">👁 •••••</span>
         </button>
       </div>
+
+      {accountChoiceOpen && (
+        <div className="fixed inset-0 z-[100] grid place-items-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="Fungua akaunti">
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="text-2xl">👋</div>
+            <h2 className="mt-2 text-xl font-extrabold text-slate-900">Fungua Dashboard</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">Una akaunti? Ingia. Huna akaunti? Jisajili ili uweze kufikia dashboard yako.</p>
+            <div className="mt-5 grid gap-2">
+              <button onClick={() => navigate({ to: "/login" })} className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white">Login</button>
+              <button onClick={() => navigate({ to: "/register" })} className="w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white">Jisajili</button>
+              <button onClick={() => setAccountChoiceOpen(false)} className="w-full rounded-xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700">Funga</button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

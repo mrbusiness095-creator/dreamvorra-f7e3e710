@@ -389,15 +389,44 @@ export const adminSetDreamVoraPaymentStatus = createServerFn({ method: "POST" })
       const payment = rows[0];
       if (!payment) throw new Error("Malipo hayajapatikana.");
       if (data.status === "APPROVED") {
-        await sql.begin(async (tx) => {
-          await tx`UPDATE dreamvora_payments SET status = 'APPROVED', approved_at = NOW(), rejected_at = NULL WHERE id = ${data.paymentId}`;
-          await tx`UPDATE dreamvora_payments SET status = 'REJECTED', rejected_at = NOW() WHERE user_id = ${payment.user_id} AND id <> ${data.paymentId} AND status = 'PENDING'`;
-          await tx`UPDATE dreamvora_users SET paid = TRUE, balance = balance + ${payment.amount} WHERE id = ${payment.user_id}`;
+        const result = await sql.begin(async (tx) => {
+          // Approving a payment is the single source of truth for activation.
+          // Make the operation idempotent so repeated taps cannot credit balance twice.
+          const approved = await tx`
+            UPDATE dreamvora_payments
+            SET status = 'APPROVED', approved_at = COALESCE(approved_at, NOW()), rejected_at = NULL
+            WHERE id = ${data.paymentId}
+            RETURNING id, user_id, amount
+          `;
+          if (!approved[0]) throw new Error("Malipo hayajapatikana.");
+
+          await tx`
+            UPDATE dreamvora_payments
+            SET status = 'REJECTED', rejected_at = NOW()
+            WHERE user_id = ${payment.user_id}
+              AND id <> ${data.paymentId}
+              AND status = 'PENDING'
+          `;
+
+          // Only the first approval adds the paid amount to the user's balance.
+          const activated = await tx`
+            UPDATE dreamvora_users
+            SET paid = TRUE, balance = CASE WHEN paid THEN balance ELSE balance + ${payment.amount} END
+            WHERE id = ${payment.user_id}
+            RETURNING id, name, username, phone, email, country, paid, balance, earnings
+          `;
+          if (!activated[0]) throw new Error("Akaunti ya user haijapatikana.");
+          return activated[0];
         });
+        return {
+          ok: true,
+          activated: Boolean(result?.paid),
+          account: result ? { ...result, id: String(result.id), paid: Boolean(result.paid), balance: Number(result.balance), earnings: Number(result.earnings ?? 0) } : null,
+        };
       } else {
         await sql`UPDATE dreamvora_payments SET status = 'REJECTED', rejected_at = NOW() WHERE id = ${data.paymentId}`;
+        return { ok: true, activated: false, account: null };
       }
-      return { ok: true };
     } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
   });
 
