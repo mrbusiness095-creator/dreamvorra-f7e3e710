@@ -34,10 +34,12 @@ async function ensureSchema(sql: ReturnType<typeof postgres>) {
       paid BOOLEAN NOT NULL DEFAULT FALSE,
       balance INTEGER NOT NULL DEFAULT 0,
       earnings INTEGER NOT NULL DEFAULT 0,
+      account_active BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
   await sql`ALTER TABLE dreamvora_users ADD COLUMN IF NOT EXISTS earnings INTEGER NOT NULL DEFAULT 0`;
+  await sql`ALTER TABLE dreamvora_users ADD COLUMN IF NOT EXISTS account_active BOOLEAN NOT NULL DEFAULT TRUE`;
   await sql`
     CREATE TABLE IF NOT EXISTS dreamvora_chat_earnings (
       id TEXT PRIMARY KEY,
@@ -112,6 +114,19 @@ async function ensureSchema(sql: ReturnType<typeof postgres>) {
   `;
   await sql`CREATE INDEX IF NOT EXISTS dreamvora_notifications_active_idx ON dreamvora_notifications(active, created_at DESC)`;
   await sql`CREATE INDEX IF NOT EXISTS dreamvora_notification_reads_user_idx ON dreamvora_notification_reads(user_id, notification_id)`;
+  await sql`ALTER TABLE dreamvora_users ADD COLUMN IF NOT EXISTS payment_pending BOOLEAN NOT NULL DEFAULT FALSE`;
+  await sql`ALTER TABLE dreamvora_users ADD COLUMN IF NOT EXISTS activated_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE dreamvora_payments ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'TZS'`;
+  await sql`ALTER TABLE dreamvora_payments ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'ZONMPAY'`;
+  await sql`ALTER TABLE dreamvora_payments ADD COLUMN IF NOT EXISTS provider_order_id TEXT`;
+  await sql`ALTER TABLE dreamvora_payments ADD COLUMN IF NOT EXISTS reference TEXT`;
+  await sql`ALTER TABLE dreamvora_payments ADD COLUMN IF NOT EXISTS channel TEXT`;
+  await sql`ALTER TABLE dreamvora_payments ADD COLUMN IF NOT EXISTS provider_status TEXT`;
+  await sql`ALTER TABLE dreamvora_payments ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE dreamvora_payments ADD COLUMN IF NOT EXISTS metadata JSONB`;
+  await sql`ALTER TABLE dreamvora_payments ALTER COLUMN lipa_number DROP NOT NULL`;
+  await sql`CREATE INDEX IF NOT EXISTS dreamvora_payments_provider_order_idx ON dreamvora_payments(provider_order_id)`;
+
 }
 
 function requireSecret() {
@@ -174,7 +189,7 @@ function cleanPhone(value: string) {
 async function getUserByToken(sql: ReturnType<typeof postgres>, token: string) {
   const userId = verifyToken(token, "user");
   const rows = await sql`
-    SELECT id, name, username, phone, email, country, paid, balance, earnings
+    SELECT id, name, username, phone, email, country, paid, account_active, payment_pending, balance, earnings
     FROM dreamvora_users WHERE id = ${userId} LIMIT 1
   `;
   if (!rows[0]) throw new Error("Akaunti haijapatikana.");
@@ -199,7 +214,7 @@ export const registerDreamVoraAccount = createServerFn({ method: "POST" })
         INSERT INTO dreamvora_users (id, name, username, phone, email, country, password_hash)
         VALUES (${id}, ${data.name.trim()}, ${username}, ${phone}, ${email}, ${data.country}, ${hashPassword(data.password)})
       `;
-      return { token: tokenFor(id, "user"), account: { id, name: data.name.trim(), username, phone, email, country: data.country, paid: false, balance: 0, earnings: 0 } };
+      return { token: tokenFor(id, "user"), account: { id, name: data.name.trim(), username, phone, email, country: data.country, paid: false, accountActive: true, paymentPending: false, balance: 0, earnings: 0 } };
     } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
   });
 
@@ -209,10 +224,11 @@ export const loginDreamVoraAccount = createServerFn({ method: "POST" })
     const sql = db();
     try {
       await ensureSchema(sql);
-      const rows = await sql`SELECT id, name, username, phone, email, country, password_hash, paid, balance, earnings FROM dreamvora_users WHERE LOWER(username) = LOWER(${data.username.trim()}) LIMIT 1`;
+      const rows = await sql`SELECT id, name, username, phone, email, country, password_hash, paid, account_active, balance, earnings FROM dreamvora_users WHERE LOWER(username) = LOWER(${data.username.trim()}) LIMIT 1`;
       const user = rows[0];
       if (!user || !verifyPassword(data.password, String(user.password_hash))) throw new Error("Username au password si sahihi.");
-      return { token: tokenFor(String(user.id), "user"), account: { id: user.id, name: user.name, username: user.username, phone: user.phone, email: user.email, country: user.country, paid: Boolean(user.paid), balance: Number(user.balance), earnings: Number(user.earnings ?? 0) } };
+      if (!Boolean(user.account_active)) throw new Error("Akaunti yako imezimwa na admin. Wasiliana na support.");
+      return { token: tokenFor(String(user.id), "user"), account: { id: user.id, name: user.name, username: user.username, phone: user.phone, email: user.email, country: user.country, paid: Boolean(user.paid), accountActive: Boolean(user.account_active), paymentPending: Boolean(user.payment_pending), balance: Number(user.balance), earnings: Number(user.earnings ?? 0) } };
     } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
   });
 
@@ -220,7 +236,18 @@ export const getDreamVoraAccount = createServerFn({ method: "POST" })
   .inputValidator((input: { token: string }) => input)
   .handler(async ({ data }) => {
     const sql = db();
-    try { await ensureSchema(sql); const user = await getUserByToken(sql, data.token); return { token: tokenFor(String(user.id), "user"), account: { ...user, id: String(user.id), balance: Number(user.balance), earnings: Number(user.earnings ?? 0), paid: Boolean(user.paid) } }; }
+    try {
+      await ensureSchema(sql);
+      const user = await getUserByToken(sql, data.token);
+      const pendingRows = await sql`SELECT provider_order_id FROM dreamvora_payments WHERE user_id=${user.id} AND provider='AUTOMATIC' AND status='PUSH_SENT' ORDER BY submitted_at DESC LIMIT 1`;
+      return { token: tokenFor(String(user.id), "user"), account: {
+        id: String(user.id), name: String(user.name), username: String(user.username), phone: String(user.phone),
+        email: String(user.email), country: String(user.country), paid: Boolean(user.paid), accountActive: Boolean(user.account_active),
+        paymentPending: Boolean(user.payment_pending),
+        paymentPendingOrderId: pendingRows[0]?.provider_order_id ? String(pendingRows[0].provider_order_id) : undefined,
+        balance: Number(user.balance), earnings: Number(user.earnings ?? 0)
+      } };
+    }
     finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
   });
 
@@ -235,7 +262,7 @@ export const recordDreamVoraChatEarning = createServerFn({ method: "POST" })
       const chatKey = data.chatKey.trim();
       const personName = String(data.personName ?? "Foreigner").trim().slice(0, 100) || "Foreigner";
       const messageCount = Math.max(1, Math.min(100, Math.floor(Number(data.messageCount ?? 10))));
-      if (!Boolean(user.paid)) throw new Error("Akaunti haijaidhinishwa.");
+      if (!Boolean(user.paid) || !Boolean(user.account_active)) throw new Error("Akaunti yako haijawezeshwa.");
       if (!chatKey || !Number.isFinite(amount) || amount <= 0 || amount > 1000000) throw new Error("Malipo ya chat si sahihi.");
       if (messageCount < 10) throw new Error("Chat haijakamilika.");
 
@@ -337,6 +364,100 @@ export const submitDreamVoraPayment = createServerFn({ method: "POST" })
     } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
   });
 
+
+export const createAutomaticPayment = createServerFn({ method: "POST" })
+  .inputValidator((input: { token: string; phone: string }) => input)
+  .handler(async ({ data }) => {
+    const sql = db();
+    try {
+      await ensureSchema(sql);
+      const user = await getUserByToken(sql, data.token);
+      if (Boolean(user.paid)) return { status: "SUCCESS", orderId: null, message: "Akaunti yako tayari iko active." };
+      const phone = cleanPhone(data.phone).replace("+", "");
+      const apiKey = process.env.FIMIPAY_API_KEY;
+      if (!apiKey) throw new Error("Automatic payment haijawekwa kwenye server.");
+      const res = await fetch("https://fimipay.com/api/v1/payment/create_order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "User-Agent": "DreamVora/1.0",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          buyer_email: user.email,
+          buyer_name: user.name,
+          buyer_phone: phone,
+          amount: PAYMENT_AMOUNT,
+          currency: "TZS",
+          payment_method: "mobile",
+        }),
+      });
+      const body = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+      const nested = body?.data && typeof body.data === "object" ? body.data as Record<string, unknown> : null;
+      if (!res.ok || String(body?.status ?? "").toLowerCase() !== "success") {
+        throw new Error(String(body?.message ?? "Automatic payment haikuanza. Jaribu tena."));
+      }
+      const orderId = String(nested?.order_id ?? body?.order_id ?? "");
+      if (!orderId) throw new Error("Order haikupatikana. Jaribu tena.");
+      const existing = await sql`SELECT id FROM dreamvora_payments WHERE provider_order_id=${orderId} LIMIT 1`;
+      if (!existing[0]) {
+        await sql`
+          INSERT INTO dreamvora_payments
+            (id,user_id,phone_used,amount,currency,provider,provider_order_id,channel,status,provider_status,metadata)
+          VALUES
+            (${randomUUID()},${user.id},${cleanPhone(data.phone)},${PAYMENT_AMOUNT},'TZS','AUTOMATIC',${orderId},'mobile','PUSH_SENT',
+             ${String(nested?.payment_status ?? "PENDING")},${JSON.stringify(body)}::jsonb)
+        `;
+      }
+      await sql`UPDATE dreamvora_users SET payment_pending=TRUE WHERE id=${user.id}`;
+      return { status: "PENDING", orderId, message: "Ombi la malipo limetumwa kwenye simu yako." };
+    } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
+  });
+
+export const checkAutomaticPayment = createServerFn({ method: "POST" })
+  .inputValidator((input: { token: string; orderId: string }) => input)
+  .handler(async ({ data }) => {
+    const sql = db();
+    try {
+      await ensureSchema(sql);
+      const user = await getUserByToken(sql, data.token);
+      if (Boolean(user.paid)) return { status: "SUCCESS" };
+      const rows = await sql`SELECT id,status FROM dreamvora_payments WHERE user_id=${user.id} AND provider='AUTOMATIC' AND provider_order_id=${data.orderId} LIMIT 1`;
+      if (!rows[0]) throw new Error("Ombi la malipo halijapatikana.");
+      const apiKey = process.env.FIMIPAY_API_KEY;
+      if (!apiKey) throw new Error("Automatic payment haijawekwa kwenye server.");
+      const res = await fetch("https://fimipay.com/api/v1/payment/order_status", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "User-Agent": "DreamVora/1.0",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ order_id: data.orderId }),
+      });
+      const body = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+      if (!res.ok) throw new Error(String(body?.message ?? "Status ya malipo haijapatikana."));
+      const nested = body?.data && typeof body.data === "object" ? body.data as Record<string, unknown> : null;
+      const status = String(nested?.payment_status ?? nested?.status ?? body?.payment_status ?? "PENDING").toUpperCase();
+      const transid = nested?.transid ? String(nested.transid) : null;
+      const failed = ["CANCELLED","USERCANCELLED","REJECTED","FAILED","DECLINED","INSUFFICIENT_FUNDS"].includes(status);
+      if (status === "SUCCESS") {
+        await sql`UPDATE dreamvora_payments SET status='APPROVED',provider_status=${status},transid=COALESCE(${transid},transid),confirmed_at=NOW(),approved_at=NOW(),metadata=${JSON.stringify(body)}::jsonb WHERE id=${rows[0].id}`;
+        await sql`UPDATE dreamvora_users SET paid=TRUE,payment_pending=FALSE,activated_at=NOW() WHERE id=${user.id}`;
+        return { status: "SUCCESS" };
+      }
+      if (failed) {
+        await sql`UPDATE dreamvora_payments SET status='FAILED',provider_status=${status},transid=COALESCE(${transid},transid),metadata=${JSON.stringify(body)}::jsonb WHERE id=${rows[0].id}`;
+        await sql`UPDATE dreamvora_users SET payment_pending=FALSE WHERE id=${user.id}`;
+        return { status: "FAILED" };
+      }
+      await sql`UPDATE dreamvora_payments SET provider_status=${status},metadata=${JSON.stringify(body)}::jsonb WHERE id=${rows[0].id}`;
+      return { status };
+    } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
+  });
+
 export const checkDreamVoraPayment = createServerFn({ method: "POST" })
   .inputValidator((input: { token: string }) => input)
   .handler(async ({ data }) => {
@@ -434,7 +555,7 @@ export const adminListDreamVoraPayments = createServerFn({ method: "POST" })
       const rows = await sql`
         SELECT p.id, p.phone_used, p.amount, p.lipa_number, p.status, p.submitted_at, p.approved_at, p.balance_credited,
                u.id AS user_id, u.name, u.username, u.phone AS account_phone, u.email,
-               u.paid AS account_paid, u.balance AS account_balance, u.earnings AS account_earnings
+               u.paid AS account_paid, u.account_active AS account_active, u.balance AS account_balance, u.earnings AS account_earnings
         FROM dreamvora_payments p JOIN dreamvora_users u ON u.id = p.user_id
         ORDER BY CASE WHEN p.status = 'PENDING' THEN 0 ELSE 1 END, p.submitted_at DESC LIMIT 200
       `;
@@ -507,6 +628,8 @@ export const adminSetDreamVoraPaymentStatus = createServerFn({ method: "POST" })
         const activated = await tx`
           UPDATE dreamvora_users
           SET paid = TRUE,
+              account_active = TRUE,
+              payment_pending = FALSE,
               balance = ${nextBalance}
           WHERE id = ${payment.user_id}
           RETURNING id, name, username, phone, email, country, paid, balance, earnings
@@ -552,6 +675,44 @@ export const adminSetDreamVoraPaymentStatus = createServerFn({ method: "POST" })
     } finally {
       await sql.end({ timeout: 1 }).catch(() => undefined);
     }
+  });
+
+
+export const adminListDreamVoraUsers = createServerFn({ method: "POST" })
+  .inputValidator((input: { token: string }) => input)
+  .handler(async ({ data }) => {
+    verifyToken(data.token, "admin");
+    const sql = db();
+    try {
+      await ensureSchema(sql);
+      const rows = await sql`
+        SELECT id, name, username, phone, email, country, paid, account_active, balance, earnings, created_at
+        FROM dreamvora_users
+        ORDER BY created_at DESC LIMIT 300
+      `;
+      return { users: rows.map((r) => ({
+        id: String(r.id), name: String(r.name), username: String(r.username), phone: String(r.phone),
+        email: String(r.email), country: String(r.country), paid: Boolean(r.paid), accountActive: Boolean(r.account_active),
+        balance: Number(r.balance ?? 0), earnings: Number(r.earnings ?? 0), createdAt: String(r.created_at)
+      })) };
+    } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
+  });
+
+export const adminSetDreamVoraAccountActive = createServerFn({ method: "POST" })
+  .inputValidator((input: { token: string; userId: string; active: boolean }) => input)
+  .handler(async ({ data }) => {
+    verifyToken(data.token, "admin");
+    const sql = db();
+    try {
+      await ensureSchema(sql);
+      const rows = await sql`
+        UPDATE dreamvora_users SET account_active=${data.active}
+        WHERE id=${data.userId}
+        RETURNING id, paid, account_active
+      `;
+      if (!rows[0]) throw new Error("User hakupatikana.");
+      return { ok: true, userId: String(rows[0].id), paid: Boolean(rows[0].paid), accountActive: Boolean(rows[0].account_active) };
+    } finally { await sql.end({ timeout: 1 }).catch(() => undefined); }
   });
 
 export { LIPA_NUMBER };

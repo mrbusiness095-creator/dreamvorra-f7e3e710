@@ -2,8 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Flag, Modal } from "@/components/dv";
 import { usersDatabase, type ForeignUser } from "@/data/users";
-import { getAccount, getSession, logout, saveServerAccount, withdrawBalance, type DreamVoraAccount } from "@/lib/local-storage";
-import { dismissDreamVoraNotification, getDreamVoraAccount, getDreamVoraNotifications } from "@/lib/dreamvora.server";
+import { clearPaymentPending, getAccount, getSession, logout, markPaid, saveServerAccount, withdrawBalance, type DreamVoraAccount } from "@/lib/local-storage";
+import { checkAutomaticPayment, dismissDreamVoraNotification, getDreamVoraAccount, getDreamVoraNotifications } from "@/lib/dreamvora.server";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — DreamVora" }, { name: "robots", content: "noindex, nofollow" }] }),
@@ -32,18 +32,29 @@ function DashboardPage() {
     if (!token) { navigate({ to: "/register" }); return; }
     void getDreamVoraAccount({ data: { token } }).then((result) => {
       saveServerAccount(result.account);
-      if (!result.account.paid) { navigate({ to: "/payment" }); return; }
+      if (!result.account.paid || result.account.accountActive === false) { navigate({ to: "/payment" }); return; }
       setAccount({ ...result.account, withdrawals: getAccount()?.withdrawals ?? [] });
       setPhone(result.account.phone);
+
     }).catch(() => navigate({ to: "/login" }));
     void getDreamVoraNotifications({ data: { token } }).then((result) => setNotifications(result.notifications)).catch(() => setNotifications([]));
+
+    const accountGuard = window.setInterval(() => {
+      const currentToken = getSession();
+      if (!currentToken) { navigate({ to: "/login" }); return; }
+      void getDreamVoraAccount({ data: { token: currentToken } }).then((fresh) => {
+        saveServerAccount(fresh.account);
+        if (!fresh.account.paid || fresh.account.accountActive === false) navigate({ to: "/payment" });
+        else setAccount((current) => current ? { ...fresh.account, withdrawals: current.withdrawals } : current);
+      }).catch(() => navigate({ to: "/login" }));
+    }, 15000);
 
     const rotate = window.setInterval(() => setUsers(shuffleUsers(usersDatabase)), 45000);
     const refreshNotifications = window.setInterval(() => {
       const currentToken = getSession();
       if (currentToken) void getDreamVoraNotifications({ data: { token: currentToken } }).then((result) => setNotifications(result.notifications)).catch(() => undefined);
     }, 30000);
-    return () => { window.clearInterval(rotate); window.clearInterval(refreshNotifications); };
+    return () => { window.clearInterval(accountGuard); window.clearInterval(rotate); window.clearInterval(refreshNotifications); };
   }, [navigate]);
 
   const pageUsers = useMemo(() => users.slice(0, 9), [users]);

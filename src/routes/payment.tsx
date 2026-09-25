@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { PAYMENT_AMOUNT } from "@/lib/kozena.functions";
-import { checkDreamVoraPayment, submitDreamVoraPayment } from "@/lib/dreamvora.server";
-import { clearPendingChat, getAccount, getPendingChat, getSession, markPaid } from "@/lib/local-storage";
+import { checkAutomaticPayment, checkDreamVoraPayment, createAutomaticPayment, submitDreamVoraPayment } from "@/lib/dreamvora.server";
+import { clearPendingChat, getAccount, getPendingChat, getSession, markPaid, markPaymentPending } from "@/lib/local-storage";
 
 export const Route = createFileRoute("/payment")({
   head: () => ({
@@ -32,6 +32,10 @@ function PaymentPage() {
   const [requestStatus, setRequestStatus] = useState<"idle" | "pending" | "approved" | "rejected">("idle");
   const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [autoSubmitting, setAutoSubmitting] = useState(false);
+  const [autoPhone, setAutoPhone] = useState("");
+  const [autoOrderId, setAutoOrderId] = useState<string | null>(null);
+  const [autoMessage, setAutoMessage] = useState<string | null>(null);
   const [verifyStep, setVerifyStep] = useState<"intro" | "form">("intro");
   const [paymentReminderOpen, setPaymentReminderOpen] = useState(false);
 
@@ -42,18 +46,16 @@ function PaymentPage() {
       return;
     }
 
-    if (account.paid) {
+    if (account.paid && account.accountActive !== false) {
       const pendingChat = getPendingChat();
-      if (pendingChat) {
-        clearPendingChat();
-        navigate({ to: "/chat/$name", params: { name: pendingChat } });
-      } else {
-        navigate({ to: "/dashboard" });
-      }
+      if (pendingChat) { clearPendingChat(); navigate({ to: "/chat/$name", params: { name: pendingChat } }); }
+      else navigate({ to: "/dashboard" });
       return;
     }
 
     setPhoneUsed(account.phone);
+    setAutoPhone(account.phone);
+    if (account.paymentPendingOrderId) setAutoOrderId(account.paymentPendingOrderId);
     setReady(true);
 
     const token = getSession();
@@ -61,6 +63,7 @@ function PaymentPage() {
       void checkDreamVoraPayment({ data: { token } }).then((result) => {
         setRequestStatus(result.status === "APPROVED" ? "approved" : result.status === "REJECTED" ? "rejected" : result.status === "PENDING" ? "pending" : "idle");
         if (result.status === "APPROVED") markPaid(PAYMENT_AMOUNT);
+        if (result.status === "REJECTED") { setPaymentMessage("FANYA MALIPO NA JARIBU TENA"); setPaymentReminderOpen(true); }
       }).catch(() => undefined);
     }
   }, [navigate]);
@@ -84,6 +87,29 @@ function PaymentPage() {
     } finally { setSubmitting(false); }
   }
 
+  async function startAutomaticPayment(e: React.FormEvent) {
+    e.preventDefault();
+    setAutoMessage(null);
+    const token = getSession();
+    if (!token) { navigate({ to: "/login" }); return; }
+    setAutoSubmitting(true);
+    try {
+      const result = await createAutomaticPayment({ data: { token, phone: autoPhone } });
+      if (result.status === "SUCCESS") {
+        markPaid(PAYMENT_AMOUNT);
+        navigate({ to: "/dashboard" });
+        return;
+      }
+      if (result.orderId) {
+        setAutoOrderId(result.orderId);
+        markPaymentPending(result.orderId ?? undefined);
+        setAutoMessage("Malipo yanasubiri uthibitisho. Tafadhali subiri hapa hadi malipo yakamilike.");
+      }
+    } catch (err) {
+      setAutoMessage(err instanceof Error ? err.message : "Malipo hayajaanzishwa. Jaribu tena.");
+    } finally { setAutoSubmitting(false); }
+  }
+
   function handlePayNow() {
     setPushUnavailable(true);
 
@@ -95,6 +121,29 @@ function PaymentPage() {
       });
     }, 1700);
   }
+
+  useEffect(() => {
+    if (!autoOrderId) return;
+    const token = getSession();
+    if (!token) return;
+    let stopped = false;
+    const poll = () => void checkAutomaticPayment({ data: { token, orderId: autoOrderId } }).then((result) => {
+      if (stopped) return;
+      if (result.status === "SUCCESS") {
+        markPaid(PAYMENT_AMOUNT);
+        setAutoMessage("Malipo yamefanikiwa. Unaelekezwa Dashboard...");
+        setTimeout(() => navigate({ to: "/dashboard" }), 500);
+      } else if (["FAILED","CANCELLED","USERCANCELLED","REJECTED"].includes(result.status)) {
+        clearPendingChat();
+        markPaymentPending(undefined);
+        setAutoOrderId(null);
+        setAutoMessage("Malipo hayajakamilika. Fanya malipo na ujaribu tena.");
+      }
+    }).catch(() => undefined);
+    poll();
+    const timer = window.setInterval(poll, 5000);
+    return () => { stopped = true; window.clearInterval(timer); };
+  }, [autoOrderId, navigate]);
 
   useEffect(() => {
     if (requestStatus !== "pending") return;
@@ -110,7 +159,8 @@ function PaymentPage() {
           else navigate({ to: "/dashboard" });
         } else if (result.status === "REJECTED") {
           setRequestStatus("rejected");
-          setPaymentMessage("Ombi la malipo limekataliwa. Hakikisha malipo yalitumwa kwenye Lipa Namba 251226427 kisha tuma ombi tena.");
+          setPaymentMessage("Malipo hayajaidhinishwa. Fanya malipo na ujaribu tena.");
+          setPaymentReminderOpen(true);
         }
       }).catch(() => undefined);
     }, 5000);
@@ -176,6 +226,24 @@ function PaymentPage() {
           <button type="button" onClick={handlePayNow} className="payment-pay-button">
             🔒 LIPA SASA
           </button>
+        </section>
+
+        <section className="payment-summary-card" aria-labelledby="automatic-payment-heading">
+          <div className="payment-summary-head">
+            <div className="payment-summary-icon">⚡</div>
+            <div>
+              <h3 id="automatic-payment-heading">Malipo ya moja kwa moja</h3>
+              <p>Thibitisha kwenye simu yako</p>
+            </div>
+          </div>
+          <p className="px-4 pb-3 text-sm text-slate-600">Weka namba ya simu utakayotumia. Utatumiwa ombi la malipo kwenye simu yako.</p>
+          <form onSubmit={startAutomaticPayment} className="px-4 pb-4">
+            <input value={autoPhone} onChange={(e) => setAutoPhone(e.target.value.replace(/[^0-9+]/g, ""))} inputMode="tel" placeholder="06XXXXXXXX" required className="k-field w-full rounded-xl border border-slate-200 px-4 py-3" />
+            <button type="submit" disabled={autoSubmitting} className="payment-pay-button mt-3">
+              {autoSubmitting ? "INATUMA..." : "LIPA KWA SIMU"}
+            </button>
+          </form>
+          {autoMessage && <div className="payment-status pending mx-4 mb-4">{autoMessage}</div>}
         </section>
 
         <section id="lipa-namba" className="ussd-card" aria-labelledby="ussd-heading">

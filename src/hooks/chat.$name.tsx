@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router"
 import { useEffect, useMemo, useState } from "react";
 import { BackButton, Flag, Header, Modal } from "@/components/dv";
 import { findUser, firstMessageBroken, generateForeignerReply } from "@/data/users";
-import { addEarnings, getAccount, getSession, saveServerAccount, setPendingChat, withdrawBalance, type DreamVoraAccount } from "@/lib/local-storage";
+import { addEarnings, getAccount, getSession, saveServerAccount, setPendingChat, setReturnTo, withdrawBalance, type DreamVoraAccount } from "@/lib/local-storage";
 import { getDreamVoraAccount } from "@/lib/dreamvora.server";
 
 export const Route = createFileRoute("/chat/$name")({
@@ -38,7 +38,7 @@ function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
   const [locked, setLocked] = useState(false);
-  const [paymentNeeded, setPaymentNeeded] = useState(false);
+  const [paymentNeeded, setPaymentNeeded] = useState(false);\n  const [authRequired, setAuthRequired] = useState(false);
   const [withdraw, setWithdraw] = useState(false);
   const [amount, setAmount] = useState("");
   const [withdrawPhone, setWithdrawPhone] = useState("");
@@ -71,7 +71,13 @@ function ChatPage() {
   function send() {
     if (!text.trim()) return;
     const current = getAccount();
-    if (!current) { setPendingChat(user.name); setLocked(true); return; }
+    const token = getSession();
+    if (!current || !token) {
+      setPendingChat(user.name);
+      setReturnTo(`/chat/${encodeURIComponent(user.name)}`);
+      setAuthRequired(true);
+      return;
+    }
     if (!current.paid) { setPendingChat(user.name); setPaymentNeeded(true); return; }
     const nextCount = messages.filter((m) => m.from === "me").length + 1;
     const nextMessage: Message = { id: `me-${Date.now()}`, from: "me", text: text.trim(), time: nowTime() };
@@ -109,6 +115,7 @@ function ChatPage() {
     </main>
     <div className="sticky bottom-0 flex items-center gap-2 border-t border-border bg-card px-3 py-2.5"><input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Andika ujumbe..." className="flex-1 rounded-full border border-border bg-secondary px-4 py-2.5 text-sm text-foreground outline-none" /><button onClick={send} className="rounded-full bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">Tuma</button></div>
 
+    <Modal open={authRequired} onClose={() => setAuthRequired(false)} icon="🔒" title="Ingia au Jisajili"><p>Ili utume ujumbe, unatakiwa kuwa na account. Chagua Jisajili kama huna account au Login kama tayari unayo.</p><div className="space-y-2 pt-3"><button onClick={goRegister} className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">Jisajili</button><button onClick={() => { setAuthRequired(false); navigate({ to: "/login" }); }} className="w-full rounded-xl border border-border bg-secondary px-4 py-2.5 text-sm font-bold text-secondary-foreground">Login</button><BackButton onClick={() => setAuthRequired(false)} label="Rudi kwenye Chat" /></div></Modal>
     <Modal open={locked} onClose={() => setLocked(false)} icon="🔒" title="Jisajili ili Kuendelea"><p>Unaweza kuanza kuona mazungumzo na foreigner, lakini huwezi kutuma meseji hadi <strong>ujisajili</strong>.</p><div className="space-y-2 pt-3"><button onClick={goRegister} className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">Jisajili SASA</button><BackButton onClick={() => setLocked(false)} label="Rudi nyuma" /></div></Modal>
     <Modal open={paymentNeeded} onClose={() => setPaymentNeeded(false)} icon="💳" title="Kamilisha Malipo"><p>Akaunti yako imesajiliwa. Kamilisha malipo ili uendelee kutuma meseji na kupata malipo.</p><div className="space-y-2 pt-3"><button onClick={() => navigate({ to: "/payment" })} className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">Lipa SASA</button><BackButton onClick={() => setPaymentNeeded(false)} label="Rudi Kwenye Chat" /></div></Modal>
     <Modal open={withdraw} onClose={() => setWithdraw(false)} icon="👛" title="Withdrawal">

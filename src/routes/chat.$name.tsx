@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router"
 import { useEffect, useMemo, useState } from "react";
 import { BackButton, Flag, Header, Modal } from "@/components/dv";
 import { findUser, firstMessageBroken, generateForeignerReply } from "@/data/users";
-import { getAccount, getSession, saveAccount, saveServerAccount, setPendingChat, withdrawBalance, type DreamVoraAccount } from "@/lib/local-storage";
+import { getAccount, getSession, saveAccount, saveServerAccount, setPendingChat, setReturnTo, withdrawBalance, type DreamVoraAccount } from "@/lib/local-storage";
 import { getDreamVoraAccount, recordDreamVoraChatEarning } from "@/lib/dreamvora.server";
 
 export const Route = createFileRoute("/chat/$name")({
@@ -55,6 +55,7 @@ function ChatPage() {
     if (token) {
       void getDreamVoraAccount({ data: { token } }).then((result) => {
         saveServerAccount(result.account);
+        if (!result.account.paid || result.account.accountActive === false) { navigate({ to: "/payment" }); return; }
         setAccount({ ...result.account, withdrawals: getAccount()?.withdrawals ?? [] });
         setWithdrawPhone(result.account.phone);
       }).catch(() => setAccount(null));
@@ -128,14 +129,10 @@ function ChatPage() {
     const current = getAccount();
     const nextMessage: Message = { id: `me-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, from: "me", text: text.trim(), time: nowTime() };
 
-    if (!current) {
-      const guestMessages = messages.filter((m) => m.from === "me").length;
-      if (guestMessages >= 1) { setPendingChat(user.name); setLocked(true); return; }
-      setMessages((prev) => [...prev, nextMessage]);
-      setText("");
-      scheduleForeignerReply(nextMessage);
+    if (!current || !getSession()) {
       setPendingChat(user.name);
-      window.setTimeout(() => setLocked(true), 250);
+      setReturnTo(`/chat/${encodeURIComponent(user.name)}`);
+      setLocked(true);
       return;
     }
 

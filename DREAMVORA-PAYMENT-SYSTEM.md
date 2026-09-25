@@ -14,6 +14,7 @@
 - `NETLIFY_DB_URL` — provided by Netlify Database after provisioning the database.
 - `DREAMVORA_AUTH_SECRET` — random secret, minimum 32 characters.
 - `DREAMVORA_ADMIN_PASSWORD` — private admin password.
+- `FIMIPAY_API_KEY` — secret API key for the automatic mobile-money payment method. Keep this server-side; never expose it in client code.
 
 ## Netlify setup
 Provision a database in Netlify under **Data & Storage → Database**, then add the three environment variables above under the site's environment variables. Deploy again. The application creates its two tables automatically on first server request.
@@ -21,3 +22,10 @@ Provision a database in Netlify under **Data & Storage → Database**, then add 
 Admin page: `/admin`
 
 Important: this version intentionally does **not** mark a payment as paid just because the customer clicks **NIMELIPIA**. Only the admin approval changes the server-side paid state.
+
+
+## Automatic payment
+The payment page now has a separate automatic mobile-money option. The server creates the payment order and checks its order status. The provider name/API key is never rendered in the customer-facing UI. A successful payment activates the account automatically; a pending request sends the user to Dashboard while the Dashboard continues checking the payment status.
+
+## Session
+User/admin auth tokens now expire after 5 minutes. If the token has expired, protected pages redirect the user to Login instead of silently continuing with an old session.
