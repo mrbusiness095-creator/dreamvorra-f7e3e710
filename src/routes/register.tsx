@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { DreamVoraBrand } from "@/components/dv";
-import { clearPendingChat, getAccount, getPendingChat, saveServerAccount, saveSession } from "@/lib/local-storage";
+import { clearPendingChat, getAccount, getPendingChat, getSession, saveServerAccount, saveSession } from "@/lib/local-storage";
 import { registerDreamVoraAccount } from "@/lib/dreamvora.server";
 
 export const Route = createFileRoute("/register")({
@@ -51,15 +51,18 @@ function RegisterPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    // Only redirect an already authenticated user. A stale account saved in
+    // localStorage must not prevent a guest from opening the registration form.
+    const token = getSession();
     const account = getAccount();
-    if (account) {
-      const pendingChat = getPendingChat();
-      if (account.paid && pendingChat) {
-        clearPendingChat();
-        navigate({ to: "/chat/$name", params: { name: pendingChat } });
-      } else {
-        navigate({ to: account.paid ? "/dashboard" : "/payment" });
-      }
+    if (!token || !account) return;
+
+    const pendingChat = getPendingChat();
+    if (account.paid && pendingChat) {
+      clearPendingChat();
+      navigate({ to: "/chat/$name", params: { name: pendingChat } });
+    } else {
+      navigate({ to: account.paid ? "/dashboard" : "/payment" });
     }
   }, [navigate]);
 
