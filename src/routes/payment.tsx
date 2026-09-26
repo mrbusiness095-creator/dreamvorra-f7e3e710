@@ -27,7 +27,6 @@ export const Route = createFileRoute("/payment")({
 function PaymentPage() {
   const navigate = useNavigate();
   const [ready, setReady] = useState(false);
-  const [pushUnavailable, setPushUnavailable] = useState(false);
   const [phoneUsed, setPhoneUsed] = useState("");
   const [requestStatus, setRequestStatus] = useState<"idle" | "pending" | "approved" | "rejected">("idle");
   const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
@@ -110,18 +109,6 @@ function PaymentPage() {
     } finally { setAutoSubmitting(false); }
   }
 
-  function handlePayNow() {
-    setPushUnavailable(true);
-
-    window.setTimeout(() => {
-      setPushUnavailable(false);
-      document.getElementById("lipa-namba")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    }, 1700);
-  }
-
   useEffect(() => {
     if (!autoOrderId) return;
     const token = getSession();
@@ -177,17 +164,6 @@ function PaymentPage() {
 
   return (
     <div className="payment-page min-h-screen bg-k-slate-50 font-jost text-k-slate-800">
-      {pushUnavailable && (
-        <div className="payment-modal-backdrop" role="alertdialog" aria-modal="true" aria-label="USSD Push haipatikani">
-          <div className="payment-modal">
-            <div className="payment-modal-icon">!</div>
-            <h2>NJIA YA USSD PUSH HAIPATIKANI KWA SASA</h2>
-            <p>TUMIA LIPA NAMBA</p>
-            <div className="payment-modal-loader" aria-hidden="true" />
-          </div>
-        </div>
-      )}
-
       <header className="payment-header-bar">
         <span className="payment-brand">
           DREAMVORA <span>SITE</span>
@@ -223,27 +199,20 @@ function PaymentPage() {
             <strong>{PAYMENT_AMOUNT.toLocaleString()} TZS</strong>
           </div>
 
-          <button type="button" onClick={handlePayNow} className="payment-pay-button">
-            🔒 LIPA SASA
-          </button>
-        </section>
-
-        <section className="payment-summary-card" aria-labelledby="automatic-payment-heading">
-          <div className="payment-summary-head">
-            <div className="payment-summary-icon">⚡</div>
-            <div>
-              <h3 id="automatic-payment-heading">Malipo ya moja kwa moja</h3>
-              <p>Thibitisha kwenye simu yako</p>
-            </div>
-          </div>
-          <p className="px-4 pb-3 text-sm text-slate-600">Weka namba ya simu utakayotumia. Utatumiwa ombi la malipo kwenye simu yako.</p>
-          <form onSubmit={startAutomaticPayment} className="px-4 pb-4">
-            <input value={autoPhone} onChange={(e) => setAutoPhone(e.target.value.replace(/[^0-9+]/g, ""))} inputMode="tel" placeholder="06XXXXXXXX" required className="k-field w-full rounded-xl border border-slate-200 px-4 py-3" />
-            <button type="submit" disabled={autoSubmitting} className="payment-pay-button mt-3">
-              {autoSubmitting ? "INATUMA..." : "LIPA KWA SIMU"}
+          <form onSubmit={startAutomaticPayment} className="payment-push-form">
+            <input
+              value={autoPhone}
+              onChange={(e) => setAutoPhone(e.target.value.replace(/[^0-9+]/g, ""))}
+              inputMode="tel"
+              placeholder="06XXXXXXXX"
+              required
+              className="k-field payment-phone-input"
+            />
+            <button type="submit" disabled={autoSubmitting} className="payment-pay-button">
+              {autoSubmitting ? "INATUMA..." : "🔒 LIPA SASA"}
             </button>
           </form>
-          {autoMessage && <div className="payment-status pending mx-4 mb-4">{autoMessage}</div>}
+          {autoMessage && <div className="payment-status pending mx-5 mb-4">{autoMessage}</div>}
         </section>
 
         <section id="lipa-namba" className="ussd-card" aria-labelledby="ussd-heading">
