@@ -706,7 +706,11 @@ export const adminSetDreamVoraAccountActive = createServerFn({ method: "POST" })
     try {
       await ensureSchema(sql);
       const rows = await sql`
-        UPDATE dreamvora_users SET account_active=${data.active}
+        UPDATE dreamvora_users
+        SET account_active=${data.active},
+            paid=CASE WHEN ${data.active} THEN TRUE ELSE paid END,
+            payment_pending=CASE WHEN ${data.active} THEN FALSE ELSE payment_pending END,
+            activated_at=CASE WHEN ${data.active} THEN NOW() ELSE activated_at END
         WHERE id=${data.userId}
         RETURNING id, paid, account_active
       `;

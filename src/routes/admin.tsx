@@ -20,11 +20,26 @@ function AdminPage(){
   const [paymentSearch,setPaymentSearch]=useState(""); const [userSearch,setUserSearch]=useState("");
 
   async function login(e:React.FormEvent){e.preventDefault();setError(null);try{const r=await adminLoginDreamVora({data:{password}});sessionStorage.setItem("dreamvora_admin",r.token);setToken(r.token);setPassword("");}catch(err){setError(err instanceof Error?err.message:"Admin login imeshindikana.")}}
-  async function load(){if(!token)return;try{const [p,u,n]=await Promise.all([adminListDreamVoraPayments({data:{token}}),adminListDreamVoraUsers({data:{token}}),adminListDreamVoraNotifications({data:{token}})]);setPayments(p.payments as Payment[]);setUsers(u.users as AdminUser[]);setNotifications(n.notifications as AdminNotification[]);setError(null)}catch(err){setError(err instanceof Error?err.message:"Imeshindikana kupakia admin data.")}}
+  async function load(){
+    if(!token)return;
+    try{
+      const [p,u,n]=await Promise.all([adminListDreamVoraPayments({data:{token}}),adminListDreamVoraUsers({data:{token}}),adminListDreamVoraNotifications({data:{token}})]);
+      setPayments(p.payments as Payment[]);setUsers(u.users as AdminUser[]);setNotifications(n.notifications as AdminNotification[]);setError(null);
+    }catch(err){
+      const message=err instanceof Error?err.message:"Imeshindikana kupakia admin data.";
+      if(message.toLowerCase().includes("session")){
+        sessionStorage.removeItem("dreamvora_admin");
+        setToken(null);
+        setError(null);
+        return;
+      }
+      setError(message);
+    }
+  }
   useEffect(()=>{void load(); if(!token)return; const t=window.setInterval(()=>void load(),15000); return()=>window.clearInterval(t)},[token]);
-  async function setStatus(id:string,status:"APPROVED"|"REJECTED"){if(!token)return;setBusy(id);setError(null);try{const result=await adminSetDreamVoraPaymentStatus({data:{token,paymentId:id,status}});if(status==="APPROVED" && result.activated !== true) throw new Error("Malipo yamebadilishwa lakini activation ya account haikukamilika.");await load()}catch(err){setError(err instanceof Error?err.message:"Imeshindikana kubadili status.")}finally{setBusy(null)}}
-  async function toggleAccount(userId:string, active:boolean){if(!token)return;setBusy(userId);setError(null);try{await adminSetDreamVoraAccountActive({data:{token,userId,active}});await load()}catch(err){setError(err instanceof Error?err.message:"Imeshindikana kubadili account.")}finally{setBusy(null)}}
-  async function createNotification(e:React.FormEvent){e.preventDefault();if(!token)return;setSending(true);setSent(null);setError(null);try{await adminCreateDreamVoraNotification({data:{token,title,message}});setTitle("");setMessage("");setSent("Notification imetumwa kwa dashboard za users.");await load()}catch(err){setError(err instanceof Error?err.message:"Notification haikutumwa.")}finally{setSending(false)}}
+  async function setStatus(id:string,status:"APPROVED"|"REJECTED"){if(!token)return;setBusy(id);setError(null);try{const result=await adminSetDreamVoraPaymentStatus({data:{token,paymentId:id,status}});if(status==="APPROVED" && result.activated !== true) throw new Error("Malipo yamebadilishwa lakini activation ya account haikukamilika.");await load()}catch(err){const message=err instanceof Error?err.message:"Imeshindikana kubadili status.";if(message.toLowerCase().includes("session")){sessionStorage.removeItem("dreamvora_admin");setToken(null);setError(null);return;}setError(message)}finally{setBusy(null)}}
+  async function toggleAccount(userId:string, active:boolean){if(!token)return;setBusy(userId);setError(null);try{await adminSetDreamVoraAccountActive({data:{token,userId,active}});await load()}catch(err){const message=err instanceof Error?err.message:"Imeshindikana kubadili account.";if(message.toLowerCase().includes("session")){sessionStorage.removeItem("dreamvora_admin");setToken(null);setError(null);return;}setError(message)}finally{setBusy(null)}}
+  async function createNotification(e:React.FormEvent){e.preventDefault();if(!token)return;setSending(true);setSent(null);setError(null);try{await adminCreateDreamVoraNotification({data:{token,title,message}});setTitle("");setMessage("");setSent("Notification imetumwa kwa dashboard za users.");await load()}catch(err){const message=err instanceof Error?err.message:"Notification haikutumwa.";if(message.toLowerCase().includes("session")){sessionStorage.removeItem("dreamvora_admin");setToken(null);setError(null);return;}setError(message)}finally{setSending(false)}}
 
   const filteredPayments = useMemo(() => {
     const q = paymentSearch.trim().toLowerCase();
