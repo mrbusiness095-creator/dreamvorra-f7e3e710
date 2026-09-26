@@ -202,7 +202,7 @@ function PaymentPage() {
             <h2>LINDA PESA YAKO</h2>
             <p>
               Lipia kupitia mfumo huu pekee. Malipo nje ya mfumo huu ni batili na hayatakubaliwa
-              OFA YA LEO LIPIA ELF 12,000TZS.
+              OFA YA LEO LIPIA ELF 15,000TZS.
             </p>
           </div>
         </div>
